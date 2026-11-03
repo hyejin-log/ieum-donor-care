@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>이음 · 의료진</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <style>
+    :root {
+      --bg: #EDF1F6; --card: #FFFFFF; --soft: #F4F7FB; --line: #E3E9F1;
+      --navy: #17233D; --ink: #22304A; --muted: #8792A6;
+      --blue: #3F6FE0; --blue-2: #6E95F2; --blue-soft: #E3EBFC;
+      --warn: #E06A4F; --warn-soft: #FCE9E4;
+      --amber: #C98A1B; --amber-soft: #FBF1DD;
+      --ok: #2E9E7A; --ok-soft: #E1F4EE;
+      --shadow: 0 1px 2px rgba(23, 35, 61, .04), 0 12px 32px rgba(23, 35, 61, .06);
+    }
+    :root[data-theme=light] {
+      --pico-background-color: var(--bg);
+      --pico-color: var(--ink);
+      --pico-primary: var(--blue);
+      --pico-primary-background: var(--navy);
+      --pico-primary-border: var(--navy);
+      --pico-primary-hover-background: #0f1a2f;
+      --pico-primary-hover-border: #0f1a2f;
+      --pico-font-family: "Pretendard", system-ui, sans-serif;
+      --pico-card-background-color: var(--card);
+      --pico-card-box-shadow: none;
+    }
+    body { background: var(--bg); }
+    main.container { max-width: 1240px; padding-top: 14px; padding-bottom: 28px; }
+    article { background: var(--card); border: none; border-radius: 24px; box-shadow: var(--shadow); margin: 0 0 14px; }
+    .label { font-size: .72rem; color: var(--muted); font-weight: 600; letter-spacing: .06em; }
+
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+              background: var(--card); border-radius: 999px; padding: 8px 10px 8px 22px; box-shadow: var(--shadow); margin-bottom: 14px; }
+    .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; color: var(--navy); font-size: 1.05rem; }
+    .logo i { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, var(--blue-2), var(--blue)); display: inline-block; }
+    .logo small { font-weight: 600; font-size: .72rem; color: var(--blue); background: var(--blue-soft); padding: 3px 10px; border-radius: 999px; }
+    .topbar a { font-size: .85rem; color: var(--muted); text-decoration: none; margin-right: 10px; }
+
+    .page-title { margin: 4px 6px 14px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+    .page-title h1 { margin: 0; font-size: 1.6rem; font-weight: 300; letter-spacing: .05em; color: var(--navy); }
+    .page-title h1 b { font-weight: 800; }
+    .page-title p { margin: 0; color: var(--muted); font-size: .85rem; }
+
+    .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+    .tile { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); padding: 14px 18px; }
+    .tile b { display: block; font-size: 1.9rem; font-weight: 800; color: var(--navy); line-height: 1.2; }
+    .tile.warn b { color: var(--warn); }
+    .tile.amber b { color: var(--amber); }
+    .tile span { font-size: .78rem; color: var(--muted); }
+
+    table { margin: 0; font-size: .88rem; }
+    th { font-size: .72rem; color: var(--muted); font-weight: 600; letter-spacing: .04em; background: transparent; border-bottom: 1px solid var(--line); }
+    td { border-bottom: 1px solid var(--line); vertical-align: middle; background: transparent; }
+    tr:last-child td { border-bottom: none; }
+    .code { font-weight: 800; color: var(--navy); }
+    th, td { white-space: nowrap; }
+    .muted { color: var(--muted); font-size: .78rem; }
+    .pill { display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+    .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .pill.missed { background: var(--warn-soft); color: var(--warn); }
+    .pill.window { background: var(--amber-soft); color: var(--amber); }
+    .pill.ok { background: var(--ok-soft); color: var(--ok); }
+    .pill.gap { background: var(--soft); color: var(--muted); }
+    .pill.gap.bad { background: var(--warn-soft); color: var(--warn); }
+    .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+    .row-actions a, .row-actions button { margin: 0; width: auto; font-size: .78rem; padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
+    .row-actions a { background: var(--soft); color: var(--ink); text-decoration: none; }
+
+    dialog article { max-width: 480px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+    #msg.ok { color: var(--ok); }
+    #msg.err { color: var(--warn); }
+    .note { font-size: .74rem; color: var(--muted); margin: 0 6px; }
+
+    @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  </style>
+</head>
+<body>
+<main class="container">
+
+  <div class="topbar">
+    <div class="logo"><i></i>이음 <small>의료진</small></div>
+    <a href="/" target="_blank">공여자 화면 보기 ↗</a>
+  </div>
+
+  <div class="page-title">
+    <h1><b>DONOR</b> FOLLOW-UP STATUS</h1>
+    <p>검사를 놓쳤거나 자가 기록이 끊긴 공여자가 위에 표시됩니다</p>
+  </div>
+
+  <section class="tiles">
+    <div class="tile"><b id="tTotal">-</b><span>전체 공여자</span></div>
+    <div class="tile warn"><b id="tMissed">-</b><span>추적검사 놓침</span></div>
+    <div class="tile amber"><b id="tWindow">-</b><span>지금 검사 기간</span></div>
+    <div class="tile"><b id="tGap">-</b><span>자가 기록 2주 이상 끊김</span></div>
+  </section>
+
+  <article>
+    <div class="overflow-auto">
+      <table>
+        <thead><tr>
+          <th>공여자</th><th>상태</th><th>다음 추적검사</th><th>최근 eGFR</th><th>자가 기록</th><th></th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="6">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+  </article>
+  <p class="note">로그인 기능이 없는 데모입니다. 실제 운영 시에는 역할별 로그인과 접근 기록이 필요합니다.</p>
+</main>
+
+<!-- 검사 결과 입력 -->
+<dialog id="labDialog">
+  <article>
+    <header>
+      <button aria-label="닫기" rel="prev" id="closeLab"></button>
+      <strong>검사 결과 입력 · <span id="labFor"></span></strong>
+    </header>
+    <form id="labForm">
+      <label>검사일 <input type="date" name="tested_at" required></label>
+      <div class="grid2">
+        <label>eGFR <input type="number" name="egfr" min="0" max="200" required></label>
+        <label>크레아티닌 (mg/dL) <input type="number" name="creatinine" min="0.1" max="20" step="0.01" required></label>
+      </div>
+      <div class="grid2">
+        <label>소변 단백
+          <select name="urine_protein">
+            <option>Negative</option><option>Trace</option><option>1+</option><option>2+</option><option>3+</option>
+          </select>
+        </label>
+        <label>입력자 <input name="entered_by" required maxlength="40" placeholder="이름"></label>
+      </div>
+      <small>검사 기간이 시작된 추적검사가 있으면 이 결과로 자동 '완료' 처리됩니다.</small>
+      <button type="submit">저장</button>
+      <p id="msg"></p>
+    </form>
+  </article>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const num = (v) => (v === "" || v === null ? null : Number(v));
+const dot = (d) => d.replaceAll("-", ".");
+const STATUS = { missed: "놓침", window: "검사 기간", ok: "정상" };
+let current = null;
+
+const now = new Date();
+const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const testedAt = document.querySelector("[name=tested_at]");
+testedAt.max = today;
+
+// 입력자 이름은 이 브라우저에 기억
+const enteredBy = document.querySelector("[name=entered_by]");
+try { enteredBy.value = localStorage.getItem("ieum-entered-by") || ""; } catch {}
+
+// 응답을 안전하게 읽기: 서버 오류(500 등)는 JSON이 아닐 수 있음
+async function readJson(res) {
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { detail: `서버 오류 (${res.status}) · 데이터베이스 준비(SQL 실행)가 끝났는지 확인해 주세요` }; }
+}
+const errText = (d) => (typeof d.detail === "string" ? d.detail : (d.detail || []).map((x) => x.msg).join(", "));
+
+async function load() {
+  try {
+    const res = await fetch("/staff/overview");
+    if (!res.ok) { $("rows").innerHTML = `<tr><td colspan="6">${errText(await readJson(res))}</td></tr>`; return; }
+    const rows = await res.json();
+    $("tTotal").textContent = rows.length;
+    $("tMissed").textContent = rows.filter((r) => r.status === "missed").length;
+    $("tWindow").textContent = rows.filter((r) => r.status === "window").length;
+    $("tGap").textContent = rows.filter((r) => r.weeks_since_home == null || r.weeks_since_home >= 2).length;
+    $("rows").innerHTML = rows.map(row).join("") || '<tr><td colspan="6">등록된 공여자가 없습니다.</td></tr>';
+    document.querySelectorAll("[data-lab]").forEach((b) => b.addEventListener("click", () => openLab(b.dataset.lab)));
+  } catch {
+    $("rows").innerHTML = '<tr><td colspan="6">서버에 연결할 수 없습니다.</td></tr>';
+  }
+}
+
+function row(r) {
+  const statusDetail = r.status === "missed" ? r.missed_visits.join(", ")
+    : r.status === "window" && r.next_visit ? r.next_visit.visit_name : "";
+  const nv = r.next_visit;
+  const next = nv ? `${nv.visit_name}<div class="muted">${dot(nv.due_date)} · ${nv.d_day >= 0 ? "D-" + nv.d_day : "D+" + -nv.d_day}</div>` : "-";
+  const egfr = r.latest_egfr != null
+    ? `${r.latest_egfr}${r.egfr_percent_of_predonation != null ? ` <span class="muted">(기증 전 ${r.egfr_percent_of_predonation}%)</span>` : ""}<div class="muted">${dot(r.latest_egfr_date)}</div>`
+    : '<span class="muted">없음</span>';
+  const w = r.weeks_since_home;
+  const gap = w == null ? '<span class="pill gap bad">기록 없음</span>'
+    : w === 0 ? '<span class="pill ok">이번 주 기록</span>'
+    : `<span class="pill gap ${w >= 2 ? "bad" : ""}">${w}주 전</span>`;
+  return `<tr>
+    <td><span class="code">${r.donor_code}</span><div class="muted">기증 후 ${r.days_since_donation}일</div></td>
+    <td><span class="pill ${r.status}">${STATUS[r.status]}</span>${statusDetail ? `<div class="muted">${statusDetail}</div>` : ""}</td>
+    <td>${next}</td>
+    <td>${egfr}</td>
+    <td>${gap}</td>
+    <td><div class="row-actions">
+      <a href="/dashboard?code=${encodeURIComponent(r.donor_code)}">상세</a>
+      <button data-lab="${r.donor_code}">검사 결과 입력</button>
+    </div></td>
+  </tr>`;
+}
+
+function showMsg(t, ok) { $("msg").textContent = t; $("msg").className = ok ? "ok" : "err"; }
+function openLab(donorCode) {
+  current = donorCode;
+  $("labFor").textContent = donorCode;
+  showMsg("", true);
+  testedAt.value = today;
+  $("labDialog").showModal();
+}
+$("closeLab").addEventListener("click", () => $("labDialog").close());
+
+$("labForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const body = {
+    donor_code: current, tested_at: f.get("tested_at"),
+    egfr: num(f.get("egfr")), creatinine: num(f.get("creatinine")),
+    urine_protein: f.get("urine_protein"), entered_by: f.get("entered_by").trim(),
+  };
+  try { localStorage.setItem("ieum-entered-by", body.entered_by); } catch {}
+  try {
+    const res = await fetch("/labs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await readJson(res);
+    if (res.ok) {
+      showMsg(data.completed_visit ? `저장했습니다 · ${data.completed_visit} 완료 처리` : "저장했습니다", true);
+      e.target.querySelector("[name=egfr]").value = "";
+      e.target.querySelector("[name=creatinine]").value = "";
+      load();
+      setTimeout(() => $("labDialog").close(), 1200);
+    } else {
+      showMsg("저장 실패: " + errText(data), false);
+    }
+  } catch { showMsg("서버에 연결할 수 없습니다.", false); }
+});
+
+load();
+</script>
+</body>
+</html>

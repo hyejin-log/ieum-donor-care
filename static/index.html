@@ -1,34 +1,382 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>신장 공여자 건강 기록</title>
+  <title>이음 · 신장 공여자 건강 노트</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <style>
+    :root {
+      --bg: #EDF1F6; --card: #FFFFFF; --soft: #F4F7FB; --line: #E3E9F1;
+      --navy: #17233D; --ink: #22304A; --muted: #8792A6;
+      --blue: #3F6FE0; --blue-2: #6E95F2; --blue-soft: #E3EBFC;
+      --warn: #E06A4F; --warn-soft: #FCE9E4;
+      --amber: #D99A2B; --amber-soft: #FBF1DD;
+      --ok: #2E9E7A; --ok-soft: #E1F4EE;
+      --radius: 24px;
+      --shadow: 0 1px 2px rgba(23, 35, 61, .04), 0 12px 32px rgba(23, 35, 61, .06);
+      --gap: 14px;
+    }
+    :root[data-theme=light] {
+      --pico-background-color: var(--bg);
+      --pico-color: var(--ink);
+      --pico-primary: var(--blue);
+      --pico-primary-background: var(--navy);
+      --pico-primary-border: var(--navy);
+      --pico-primary-hover-background: #0f1a2f;
+      --pico-primary-hover-border: #0f1a2f;
+      --pico-font-family: "Pretendard", system-ui, sans-serif;
+      --pico-card-background-color: var(--card);
+      --pico-card-box-shadow: none;
+      --pico-block-spacing-vertical: 1.1rem;
+      --pico-block-spacing-horizontal: 1.3rem;
+    }
+    body { background: var(--bg); }
+    main.container { max-width: 1440px; padding-top: 14px; padding-bottom: 14px; }
+    article { background: var(--card); border: none; border-radius: var(--radius); box-shadow: var(--shadow); margin: 0; min-width: 0; }
+    .label { font-size: .72rem; color: var(--muted); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+    .card-title { font-size: .95rem; font-weight: 700; color: var(--navy); }
+
+    /* ---------- 상단 바 ---------- */
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+              background: var(--card); border-radius: 999px; padding: 8px 10px 8px 22px; box-shadow: var(--shadow); margin-bottom: var(--gap); }
+    .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; color: var(--navy); font-size: 1.05rem; letter-spacing: .02em; }
+    .logo i { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, var(--blue-2), var(--blue)); display: inline-block; }
+    .logo small { font-weight: 500; color: var(--muted); font-size: .8rem; margin-left: 4px; }
+    .actions { display: flex; align-items: center; gap: 8px; }
+    .actions input { margin: 0; width: 100px; height: auto; padding: 8px 14px; border-radius: 999px; font-size: .85rem; background: var(--soft); border: none; }
+    .pill-btn { margin: 0; width: auto; padding: 9px 18px; border-radius: 999px; font-size: .85rem; font-weight: 600; }
+    .pill-btn.ghost { background: var(--soft); color: var(--ink); border: none; }
+    #todayStatus { font-size: .78rem; color: var(--muted); padding: 0 6px; white-space: nowrap; }
+    #todayStatus.done { color: var(--ok); }
+    .who { display: flex; align-items: center; gap: 10px; padding-left: 10px; border-left: 1px solid var(--line); margin-left: 4px; }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--blue-soft); color: var(--blue); display: grid; place-items: center; font-weight: 800; font-size: .72rem; }
+    .who b { display: block; font-size: .85rem; color: var(--navy); line-height: 1.2; }
+    .who span { font-size: .72rem; color: var(--muted); }
+
+    /* ---------- 제목 ---------- */
+    .page-title { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 6px var(--gap); }
+    .page-title h1 { margin: 0; font-size: clamp(1.4rem, 3.2vh, 2rem); font-weight: 300; letter-spacing: .06em; color: var(--navy); }
+    .page-title h1 b { font-weight: 800; }
+    .page-title p { margin: 0; color: var(--muted); font-size: .85rem; }
+
+    /* ---------- 본문 그리드 ---------- */
+    .grid { display: grid; gap: var(--gap); grid-template-columns: minmax(0, 1fr);
+            grid-template-areas: "hero" "side" "egfr" "bp"; }
+    .hero { grid-area: hero; } .egfr { grid-area: egfr; } .bp { grid-area: bp; } .side { grid-area: side; }
+
+    /* 히어로: 신장 그림 */
+    .hero { display: flex; flex-direction: column; position: relative; overflow: hidden;
+            background: radial-gradient(120% 90% at 70% 40%, #14306E 0%, #0B1A40 55%, #070F27 100%); color: #DCE8FF; }
+    .hero .card-title { color: #fff; }
+    .hero .chip.blue { background: rgba(95, 212, 255, .12); color: #8FE0FF; }
+    .hero .tile { background: rgba(255, 255, 255, .05); border: 1px solid rgba(143, 224, 255, .14); }
+    .hero .tile .num { color: #fff; }
+    .hero .tile .num small, .hero .tile .sub, .hero .label { color: rgba(220, 232, 255, .6); }
+    @keyframes flow { to { stroke-dashoffset: -400; } }
+    .orbit { animation: flow 14s linear infinite; }
+    .orbit.rev { animation-direction: reverse; animation-duration: 18s; }
+    @keyframes flowDown { from { transform: translateY(0); } to { transform: translateY(340px); } }
+    .flow-down { animation: flowDown 4.5s linear infinite; }
+    .flow-down.late { animation-delay: -2.25s; }
+    @keyframes twinkle { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+    .hero .twinkle { animation: twinkle 3.2s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) { .orbit, .glow, .hero .twinkle, .flow-down { animation: none; } }
+    .hero-top { display: flex; justify-content: space-between; align-items: center; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; font-size: .74rem; font-weight: 600; padding: 5px 12px; border-radius: 999px; background: var(--soft); color: var(--ink); }
+    .chip.blue { background: var(--blue-soft); color: var(--blue); }
+    .kidney-stage { flex: 1; min-height: 220px; display: grid; place-items: center; position: relative; }
+    .kidney-stage svg { width: 100%; height: 100%; max-height: 360px; }
+    .hero-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tile { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 12px 16px; min-width: 0; }
+    .tile .num { font-size: clamp(1.4rem, 3.4vh, 1.9rem); font-weight: 800; color: var(--navy); line-height: 1.2; font-variant-numeric: tabular-nums; }
+    .tile .num small { font-size: .8rem; font-weight: 600; color: var(--muted); margin-left: 3px; }
+    .tile .sub { font-size: .74rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    @keyframes breathe { 0%, 100% { opacity: .35; transform: scale(1); } 50% { opacity: .6; transform: scale(1.04); } }
+    .glow { transform-origin: center; transform-box: fill-box; animation: breathe 4s ease-in-out infinite; }
+
+    /* 그래프 카드 */
+    .chart-card { display: flex; flex-direction: column; }
+    .chart-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .chart-top .big { font-size: clamp(1.3rem, 3vh, 1.7rem); font-weight: 800; color: var(--navy); line-height: 1.1; }
+    .chart-top .meta { font-size: .76rem; color: var(--muted); margin-top: 2px; }
+    .chart-box { position: relative; flex: 1; min-height: 220px; margin-top: 10px; }
+    .fine { color: var(--muted); font-size: .72rem; margin: 8px 0 0; }
+    .ring { width: 84px; height: 84px; flex: none; }
+    .ring text { font-family: "Pretendard", sans-serif; }
+
+    /* 사이드 */
+    .side { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+    .next { background: linear-gradient(135deg, #2F5BD0 0%, #5A86EE 100%); color: #fff; }
+    .next .label { color: rgba(255, 255, 255, .75); }
+    .next .dday { font-size: clamp(2rem, 5vh, 2.8rem); font-weight: 800; line-height: 1.1; margin: 4px 0 2px; letter-spacing: -.01em; }
+    .next .sub { font-size: .82rem; color: rgba(255, 255, 255, .8); }
+    .next .flag { margin-top: 12px; background: rgba(255, 255, 255, .14); border-radius: 12px; padding: 8px 12px; font-size: .78rem; display: flex; gap: 8px; align-items: center; }
+    .next .flag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #FFC2B2; flex: none; }
+    .next .flag.amber::before { background: #FFE19C; }
+    .next .flag:empty { display: none; }
+
+    .journey { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .visit-list { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+    .visit-list li { list-style: none; display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 14px; background: var(--soft); margin: 0; }
+    .v-icon { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-size: .72rem; font-weight: 800; flex: none; }
+    .done .v-icon { background: var(--ok-soft); color: var(--ok); }
+    .missed .v-icon { background: var(--warn-soft); color: var(--warn); }
+    .window .v-icon { background: var(--amber-soft); color: var(--amber); }
+    .upcoming .v-icon { background: var(--blue-soft); color: var(--blue); }
+    .v-text { flex: 1; min-width: 0; }
+    .v-text b { display: block; font-size: .84rem; color: var(--navy); line-height: 1.25; }
+    .v-text span { font-size: .72rem; color: var(--muted); white-space: nowrap; }
+    .status { font-size: .7rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+    .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .done .status { background: var(--ok-soft); color: var(--ok); }
+    .missed .status { background: var(--warn-soft); color: var(--warn); }
+    .window .status { background: var(--amber-soft); color: var(--amber); }
+    .upcoming .status { background: var(--card); color: var(--muted); }
+
+    table { font-size: .88rem; margin-bottom: 0; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
-    @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } }
-    #msg.ok { color: #2e7d32; }
-    #msg.err { color: #c62828; }
+    #msg.ok { color: var(--ok); }
+    #msg.err { color: var(--warn); }
+    dialog article { box-shadow: 0 24px 64px rgba(0, 0, 0, .2); }
+
+    /* ---------- 넓은 화면: 3열 ---------- */
+    @media (min-width: 1001px) {
+      .grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.15fr) minmax(0, .85fr);
+              grid-template-rows: minmax(0, 1.1fr) minmax(0, 1fr);
+              grid-template-areas: "hero egfr side" "bp egfr side"; }
+    }
+    /* 넓고 충분히 높은 화면: 스크롤 없이 한 화면에 */
+    @media (min-width: 1001px) and (min-height: 600px) {
+      body { overflow: hidden; }
+      main.container { height: 100vh; display: flex; flex-direction: column; }
+      .grid { flex: 1; min-height: 0; }
+      .grid > * { min-height: 0; }
+      .kidney-stage { min-height: 0; }
+      .chart-box { min-height: 0; }
+      .visit-list { justify-content: flex-start; }
+      .visit-list li { padding: clamp(5px, .9vh, 8px) 10px; }
+      .next { padding-top: clamp(.7rem, 1.6vh, 1.1rem); padding-bottom: clamp(.7rem, 1.6vh, 1.1rem); }
+      .next .dday { font-size: clamp(1.7rem, 4.2vh, 2.6rem); }
+      .next .flag { margin-top: clamp(6px, 1.2vh, 12px); }
+    }
+    @media (max-width: 700px) {
+      .who, #todayStatus { display: none; }
+      .grid2 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
 <main class="container">
-  <h1>신장 공여자 건강 기록</h1>
 
-  <div class="grid2">
-    <label>공여자 코드
-      <input id="donorCode" value="D-001">
-    </label>
-    <label>&nbsp;
-      <button id="loadBtn" class="secondary">기록 불러오기</button>
-    </label>
+  <!-- 상단 바 -->
+  <div class="topbar">
+    <div class="logo"><i></i>이음<small>신장 공여자 건강 노트</small></div>
+    <div class="actions">
+      <span id="todayStatus"></span>
+      <input id="donorCode" value="D-001" aria-label="공여자 코드">
+      <button id="openRecords" class="pill-btn ghost">전체 기록</button>
+      <button id="openForm" class="pill-btn">＋ 오늘 기록</button>
+      <div class="who"><div class="avatar" id="avatar">D</div><div><b id="whoName">-</b><span id="whoSub">-</span></div></div>
+    </div>
   </div>
 
+  <!-- 제목 -->
+  <div class="page-title">
+    <h1><b>KIDNEY</b> DONOR FOLLOW-UP</h1>
+    <p>생체 신장 기증 이후의 건강을 끊기지 않게 잇습니다</p>
+  </div>
+
+  <div class="grid">
+
+    <!-- 히어로: 남은 신장 -->
+    <article class="hero">
+      <div class="hero-top">
+        <span class="card-title">나의 신장</span>
+        <span class="chip blue">남은 신장 1개</span>
+      </div>
+      <div class="kidney-stage">
+        <svg viewBox="0 0 420 300" role="img" aria-label="기증한 신장과 남은 신장 그림">
+          <defs>
+            <path id="kidney" d="M55 4 C 80 4 92 30 92 75 C 92 120 80 146 55 146 C 32 146 18 128 16 108
+                     C 15 98 26 92 30 84 C 33 78 33 72 30 66 C 26 58 15 52 16 42 C 18 22 32 4 55 4 Z"/>
+            <radialGradient id="kFill" cx="35%" cy="50%" r="70%">
+              <stop offset="0%" stop-color="#5FD4FF" stop-opacity=".40"/>
+              <stop offset="60%" stop-color="#2F7BFF" stop-opacity=".16"/>
+              <stop offset="100%" stop-color="#2F7BFF" stop-opacity=".05"/>
+            </radialGradient>
+            <radialGradient id="hilumCool" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#BFF0FF" stop-opacity=".9"/>
+              <stop offset="35%" stop-color="#5FD4FF" stop-opacity=".55"/>
+              <stop offset="100%" stop-color="#2F7BFF" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="hilumWarm" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#FFD1D8" stop-opacity=".95"/>
+              <stop offset="35%" stop-color="#FF5A78" stop-opacity=".6"/>
+              <stop offset="100%" stop-color="#FF5A78" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#BFF0FF" stop-opacity="0"/>
+              <stop offset="50%" stop-color="#E6FAFF" stop-opacity=".95"/>
+              <stop offset="100%" stop-color="#BFF0FF" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="branchGrad" x1="224" y1="0" x2="282" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#FF8DB5"/>
+              <stop offset="100%" stop-color="#8FE0FF"/>
+            </linearGradient>
+            <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="2.4" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- 가운데 대동맥 · 대정맥 (유리관) -->
+          <defs>
+            <linearGradient id="tubeA" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#9CC4FF" stop-opacity=".85"/>
+              <stop offset="25%" stop-color="#4E6FD8" stop-opacity=".55"/>
+              <stop offset="55%" stop-color="#6B4FB0" stop-opacity=".45"/>
+              <stop offset="80%" stop-color="#4E6FD8" stop-opacity=".55"/>
+              <stop offset="100%" stop-color="#9CC4FF" stop-opacity=".85"/>
+            </linearGradient>
+            <linearGradient id="flowGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0"/>
+              <stop offset="50%" stop-color="#E6F2FF" stop-opacity=".55"/>
+              <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+            </linearGradient>
+            <clipPath id="tubeClip">
+              <rect x="197" y="12" width="12" height="266" rx="6"/>
+              <rect x="211" y="12" width="13" height="266" rx="6.5"/>
+            </clipPath>
+          </defs>
+          <g filter="url(#glow)">
+            <rect x="197" y="12" width="12" height="266" rx="6" fill="url(#tubeA)" stroke="#B9D6FF" stroke-opacity=".7" stroke-width=".9"/>
+            <rect x="211" y="12" width="13" height="266" rx="6.5" fill="url(#tubeA)" stroke="#B9D6FF" stroke-opacity=".7" stroke-width=".9"/>
+          </g>
+          <g clip-path="url(#tubeClip)">
+            <g fill="#E8F1FF" opacity=".55"><circle cx="202.6" cy="160.2" r="1"/><circle cx="202.6" cy="235.2" r="0.6"/><circle cx="200.5" cy="148.0" r="0.6"/><circle cx="199.8" cy="95.1" r="0.5"/><circle cx="203.3" cy="244.2" r="0.5"/><circle cx="203.8" cy="118.6" r="1"/><circle cx="204.2" cy="174.4" r="0.6"/><circle cx="204.0" cy="229.3" r="0.5"/><circle cx="199.5" cy="66.3" r="0.6"/><circle cx="203.8" cy="215.6" r="0.8"/><circle cx="202.5" cy="232.0" r="0.6"/><circle cx="204.1" cy="144.9" r="0.5"/><circle cx="202.7" cy="88.7" r="0.5"/><circle cx="204.7" cy="98.1" r="0.6"/><circle cx="203.1" cy="25.6" r="0.5"/><circle cx="202.2" cy="233.0" r="1"/><circle cx="199.5" cy="22.3" r="0.5"/><circle cx="200.7" cy="253.5" r="0.5"/><circle cx="202.8" cy="267.0" r="1"/><circle cx="202.4" cy="161.8" r="0.6"/><circle cx="205.2" cy="86.5" r="0.5"/><circle cx="201.5" cy="21.8" r="1"/><circle cx="205.1" cy="48.0" r="0.6"/><circle cx="204.7" cy="20.8" r="1"/><circle cx="205.4" cy="63.1" r="0.6"/><circle cx="202.6" cy="66.4" r="0.6"/><circle cx="202.4" cy="115.5" r="1"/><circle cx="202.4" cy="72.1" r="0.8"/><circle cx="205.9" cy="265.6" r="0.8"/><circle cx="207.0" cy="23.0" r="0.6"/><circle cx="202.2" cy="235.0" r="0.5"/><circle cx="199.3" cy="55.2" r="1"/><circle cx="201.1" cy="214.3" r="0.8"/><circle cx="205.6" cy="116.1" r="0.5"/><circle cx="199.7" cy="166.0" r="0.6"/><circle cx="199.1" cy="111.6" r="1"/><circle cx="200.0" cy="167.2" r="0.6"/><circle cx="205.9" cy="64.4" r="0.6"/><circle cx="215.8" cy="76.0" r="0.6"/><circle cx="219.5" cy="58.3" r="0.6"/><circle cx="219.2" cy="116.6" r="1"/><circle cx="218.4" cy="125.1" r="0.5"/><circle cx="214.0" cy="148.1" r="0.8"/><circle cx="215.1" cy="197.0" r="0.8"/><circle cx="216.8" cy="247.8" r="1"/><circle cx="215.6" cy="62.6" r="0.5"/><circle cx="214.1" cy="139.7" r="0.5"/><circle cx="215.5" cy="251.0" r="0.6"/><circle cx="219.7" cy="35.6" r="1"/><circle cx="217.0" cy="33.4" r="0.6"/><circle cx="215.5" cy="152.9" r="0.6"/><circle cx="213.8" cy="53.2" r="1"/><circle cx="221.8" cy="184.9" r="0.6"/><circle cx="218.3" cy="252.6" r="1"/><circle cx="221.2" cy="196.0" r="0.5"/><circle cx="213.2" cy="179.6" r="1"/><circle cx="213.6" cy="97.0" r="0.6"/><circle cx="222.0" cy="37.1" r="0.8"/><circle cx="219.6" cy="246.6" r="0.6"/><circle cx="220.1" cy="250.4" r="0.8"/><circle cx="213.8" cy="138.2" r="0.5"/><circle cx="220.8" cy="124.0" r="0.5"/><circle cx="220.8" cy="163.5" r="1"/><circle cx="216.4" cy="21.2" r="0.5"/><circle cx="213.7" cy="180.4" r="0.8"/><circle cx="220.9" cy="203.0" r="1"/><circle cx="221.4" cy="194.3" r="1"/><circle cx="217.0" cy="230.9" r="0.5"/><circle cx="217.7" cy="148.7" r="0.8"/><circle cx="218.4" cy="140.2" r="0.6"/><circle cx="221.6" cy="46.7" r="1"/><circle cx="215.3" cy="20.9" r="0.8"/><circle cx="214.3" cy="173.4" r="0.6"/><circle cx="219.8" cy="105.0" r="1"/><circle cx="217.5" cy="79.3" r="1"/><circle cx="219.0" cy="68.4" r="1"/></g>
+            <rect x="196" y="-60" width="30" height="70" fill="url(#flowGrad)" class="flow-down"/>
+            <rect x="196" y="-60" width="30" height="70" fill="url(#flowGrad)" class="flow-down late"/>
+            <path d="M200 14V276M214 14V276" stroke="#FFFFFF" stroke-opacity=".35" stroke-width="1.2"/>
+          </g>
+          <!-- 콩팥 혈관이 갈라지는 곳: 남은 신장 쪽 관 가장자리에만 작은 빛 -->
+          <circle cx="224" cy="140" r="2.2" fill="#FFC2D6" filter="url(#glow)"/>
+          <circle cx="224" cy="150" r="2.4" fill="#FFC2D6" filter="url(#glow)"/>
+
+          <!-- 신장으로 가는 혈관 · 요관 -->
+          <g filter="url(#glow)" fill="none" stroke-linecap="round">
+            <!-- 오른쪽(남은 신장) -->
+            <path d="M224 140 C 244 138 262 140 280 143" stroke="url(#branchGrad)" stroke-width="2.6" stroke-opacity=".9"/>
+            <path d="M224 150 C 244 151 262 151 280 150" stroke="url(#branchGrad)" stroke-width="3" stroke-opacity=".8"/>
+            <path d="M278 154 C 258 172 240 196 234 278" stroke="#8FE0FF" stroke-width="1.8" stroke-opacity=".7"/>
+            <!-- 왼쪽(기증한 신장): 흐리게 -->
+            <path d="M198 140 C 176 138 158 140 140 143 M198 150 C 176 151 158 151 140 150 M142 154 C 162 172 180 196 186 278"
+                  stroke="#8FBEFF" stroke-width="1.4" stroke-opacity=".22" stroke-dasharray="3 4"/>
+          </g>
+
+          <!-- 기증한 신장 (왼쪽, 흐린 그물) -->
+          <g transform="translate(170 70) scale(-1 1)" opacity=".22">
+              <use href="#kidney" fill="url(#kFill)"/>
+              <path d="M55.0 4.0L65.8 5.9M55.0 4.0L44.1 5.5M55.0 4.0L49.5 20.8M55.0 4.0L62.2 16.2M65.8 5.9L75.0 11.7M65.8 5.9L62.2 16.2M75.0 11.7L81.7 20.4M75.0 11.7L71.2 27.7M75.0 11.7L62.2 16.2M81.7 20.4L86.1 30.5M81.7 20.4L71.2 27.7M86.1 30.5L89.0 41.1M86.1 30.5L71.2 27.7M86.1 30.5L72.7 40.3M86.1 30.5L81.3 45.7M89.0 41.1L90.8 51.9M89.0 41.1L81.3 45.7M90.8 51.9L91.7 62.9M90.8 51.9L80.3 58.5M90.8 51.9L81.3 45.7M91.7 62.9L92.0 73.9M91.7 62.9L82.7 71.0M91.7 62.9L80.3 58.5M92.0 73.9L91.8 84.9M92.0 73.9L84.9 81.2M92.0 73.9L82.7 71.0M91.8 84.9L91.0 95.9M91.8 84.9L77.6 88.1M91.8 84.9L84.9 81.2M91.0 95.9L89.4 106.7M91.0 95.9L77.6 88.1M91.0 95.9L85.2 100.5M89.4 106.7L86.8 117.4M89.4 106.7L85.2 100.5M89.4 106.7L83.1 111.3M86.8 117.4L82.7 127.6M86.8 117.4L73.9 115.8M86.8 117.4L83.1 111.3M82.7 127.6L76.6 136.7M82.7 127.6L73.9 115.8M82.7 127.6L72.2 127.2M76.6 136.7L67.8 143.2M76.6 136.7L72.2 127.2M67.8 143.2L57.2 145.9M67.8 143.2L58.6 131.8M67.8 143.2L72.2 127.2M57.2 145.9L46.3 145.1M57.2 145.9L48.4 132.9M57.2 145.9L58.6 131.8M46.3 145.1L36.1 141.2M46.3 145.1L48.4 132.9M46.3 145.1L38.2 134.5M36.1 141.2L27.5 134.3M36.1 141.2L38.2 134.5M27.5 134.3L21.1 125.4M27.5 134.3L35.9 122.6M27.5 134.3L38.2 134.5M21.1 125.4L17.2 115.1M21.1 125.4L35.9 122.6M21.1 125.4L26.3 117.5M17.2 115.1L16.2 104.3M17.2 115.1L22.2 108.3M17.2 115.1L26.3 117.5M16.2 104.3L21.5 94.8M16.2 104.3L22.2 108.3M21.5 94.8L28.6 86.4M21.5 94.8L37.2 90.8M21.5 94.8L22.2 108.3M21.5 94.8L38.1 101.4M28.6 86.4L32.2 76.1M28.6 86.4L37.2 90.8M28.6 86.4L42.6 79.6M32.2 76.1L29.8 65.5M32.2 76.1L42.6 79.6M32.2 76.1L45.8 67.7M29.8 65.5L23.0 56.9M29.8 65.5L45.8 67.7M29.8 65.5L35.5 58.1M23.0 56.9L16.8 47.9M23.0 56.9L28.2 49.5M23.0 56.9L35.5 58.1M16.8 47.9L16.7 37.0M16.8 47.9L28.2 49.5M16.8 47.9L28.4 39.0M16.7 37.0L20.2 26.6M16.7 37.0L28.4 39.0M20.2 26.6L26.0 17.3M20.2 26.6L28.4 39.0M20.2 26.6L29.7 28.4M26.0 17.3L34.2 10.0M26.0 17.3L35.1 19.4M26.0 17.3L29.7 28.4M34.2 10.0L44.1 5.5M34.2 10.0L35.1 19.4M44.1 5.5L49.5 20.8M44.1 5.5L35.1 19.4M37.2 90.8L42.6 79.6M37.2 90.8L48.3 100.2M37.2 90.8L48.2 88.0M37.2 90.8L38.1 101.4M28.2 49.5L28.4 39.0M28.2 49.5L45.3 47.5M28.2 49.5L35.5 58.1M28.4 39.0L45.3 47.5M28.4 39.0L41.3 32.6M28.4 39.0L29.7 28.4M73.9 115.8L58.4 114.8M73.9 115.8L73.0 103.4M73.9 115.8L72.2 127.2M73.9 115.8L83.1 111.3M57.6 71.1L47.8 57.3M57.6 71.1L67.6 60.3M57.6 71.1L62.9 85.8M57.6 71.1L42.6 79.6M57.6 71.1L45.8 67.7M57.6 71.1L72.5 75.9M57.6 71.1L48.2 88.0M22.2 108.3L34.1 110.9M22.2 108.3L38.1 101.4M22.2 108.3L26.3 117.5M35.9 122.6L48.4 132.9M35.9 122.6L34.1 110.9M35.9 122.6L47.9 110.5M35.9 122.6L38.2 134.5M35.9 122.6L50.3 121.8M35.9 122.6L26.3 117.5M47.8 57.3L67.6 60.3M47.8 57.3L45.3 47.5M47.8 57.3L45.8 67.7M47.8 57.3L61.4 47.4M47.8 57.3L35.5 58.1M58.4 114.8L61.3 99.8M58.4 114.8L58.6 131.8M58.4 114.8L73.0 103.4M58.4 114.8L72.2 127.2M58.4 114.8L47.9 110.5M58.4 114.8L50.3 121.8M77.6 88.1L62.9 85.8M77.6 88.1L61.3 99.8M77.6 88.1L84.9 81.2M77.6 88.1L72.5 75.9M77.6 88.1L73.0 103.4M77.6 88.1L85.2 100.5M67.6 60.3L72.5 75.9M67.6 60.3L82.7 71.0M67.6 60.3L61.4 47.4M67.6 60.3L80.3 58.5M67.6 60.3L70.9 50.6M62.9 85.8L61.3 99.8M62.9 85.8L72.5 75.9M62.9 85.8L48.2 88.0M42.6 79.6L45.8 67.7M42.6 79.6L48.2 88.0M49.5 20.8L35.1 19.4M49.5 20.8L57.9 35.2M49.5 20.8L62.2 16.2M49.5 20.8L41.3 32.6M71.2 27.7L57.9 35.2M71.2 27.7L62.2 16.2M71.2 27.7L72.7 40.3M48.4 132.9L58.6 131.8M48.4 132.9L38.2 134.5M48.4 132.9L50.3 121.8M45.3 47.5L57.9 35.2M45.3 47.5L41.3 32.6M45.3 47.5L61.4 47.4M45.3 47.5L35.5 58.1M61.3 99.8L73.0 103.4M61.3 99.8L48.3 100.2M61.3 99.8L47.9 110.5M61.3 99.8L48.2 88.0M35.1 19.4L41.3 32.6M35.1 19.4L29.7 28.4M34.1 110.9L47.9 110.5M34.1 110.9L38.1 101.4M34.1 110.9L26.3 117.5M58.6 131.8L72.2 127.2M58.6 131.8L50.3 121.8M45.8 67.7L35.5 58.1M84.9 81.2L72.5 75.9M84.9 81.2L82.7 71.0M57.9 35.2L62.2 16.2M57.9 35.2L72.7 40.3M57.9 35.2L41.3 32.6M57.9 35.2L61.4 47.4M72.7 40.3L61.4 47.4M72.7 40.3L70.9 50.6M72.7 40.3L81.3 45.7M41.3 32.6L29.7 28.4M72.5 75.9L82.7 71.0M82.7 71.0L80.3 58.5M73.0 103.4L85.2 100.5M73.0 103.4L83.1 111.3M48.3 100.2L47.9 110.5M48.3 100.2L48.2 88.0M48.3 100.2L38.1 101.4M61.4 47.4L70.9 50.6M85.2 100.5L83.1 111.3M80.3 58.5L70.9 50.6M80.3 58.5L81.3 45.7M47.9 110.5L38.1 101.4M47.9 110.5L50.3 121.8M70.9 50.6L81.3 45.7" fill="none" stroke="#9FE3FF" stroke-opacity=".38" stroke-width=".6"/>
+              <g fill="#DDF6FF" filter="url(#glow)"><circle cx="55.0" cy="4.0" r="1.6"/><circle cx="65.8" cy="5.9" r="1.6"/><circle cx="75.0" cy="11.7" r="1.6"/><circle cx="81.7" cy="20.4" r="1.6"/><circle cx="86.1" cy="30.5" r="1.6"/><circle cx="89.0" cy="41.1" r="1.6"/><circle cx="90.8" cy="51.9" r="1.6"/><circle cx="91.7" cy="62.9" r="1.6"/><circle cx="92.0" cy="73.9" r="1.6"/><circle cx="91.8" cy="84.9" r="1.6"/><circle cx="91.0" cy="95.9" r="1.6"/><circle cx="89.4" cy="106.7" r="1.6"/><circle cx="86.8" cy="117.4" r="1.6"/><circle cx="82.7" cy="127.6" r="1.6"/><circle cx="76.6" cy="136.7" r="1.6"/><circle cx="67.8" cy="143.2" r="1.6"/><circle cx="57.2" cy="145.9" r="1.6"/><circle cx="46.3" cy="145.1" r="1.6"/><circle cx="36.1" cy="141.2" r="1.6"/><circle cx="27.5" cy="134.3" r="1.6"/><circle cx="21.1" cy="125.4" r="1.6"/><circle cx="17.2" cy="115.1" r="1.6"/><circle cx="16.2" cy="104.3" r="1.6"/><circle cx="21.5" cy="94.8" r="1.6"/><circle cx="28.6" cy="86.4" r="1.6"/><circle cx="32.2" cy="76.1" r="1.6"/><circle cx="29.8" cy="65.5" r="1.6"/><circle cx="23.0" cy="56.9" r="1.6"/><circle cx="16.8" cy="47.9" r="1.6"/><circle cx="16.7" cy="37.0" r="1.6"/><circle cx="20.2" cy="26.6" r="1.6"/><circle cx="26.0" cy="17.3" r="1.6"/><circle cx="34.2" cy="10.0" r="1.6"/><circle cx="44.1" cy="5.5" r="1.6"/><circle cx="37.2" cy="90.8" r="1.2"/><circle cx="28.2" cy="49.5" r="1.2"/><circle cx="28.4" cy="39.0" r="1.2"/><circle cx="73.9" cy="115.8" r="1.2"/><circle cx="57.6" cy="71.1" r="1.2"/><circle cx="22.2" cy="108.3" r="1.2"/><circle cx="35.9" cy="122.6" r="1.2"/><circle cx="47.8" cy="57.3" r="1.2"/><circle cx="58.4" cy="114.8" r="1.2"/><circle cx="77.6" cy="88.1" r="1.2"/><circle cx="67.6" cy="60.3" r="1.2"/><circle cx="62.9" cy="85.8" r="1.2"/><circle cx="42.6" cy="79.6" r="1.2"/><circle cx="49.5" cy="20.8" r="1.2"/><circle cx="71.2" cy="27.7" r="1.2"/><circle cx="48.4" cy="132.9" r="1.2"/><circle cx="45.3" cy="47.5" r="1.2"/><circle cx="61.3" cy="99.8" r="1.2"/><circle cx="35.1" cy="19.4" r="1.2"/><circle cx="34.1" cy="110.9" r="1.2"/><circle cx="58.6" cy="131.8" r="1.2"/><circle cx="45.8" cy="67.7" r="1.2"/><circle cx="84.9" cy="81.2" r="1.2"/><circle cx="57.9" cy="35.2" r="1.2"/><circle cx="62.2" cy="16.2" r="1.2"/><circle cx="72.7" cy="40.3" r="1.2"/><circle cx="41.3" cy="32.6" r="1.2"/><circle cx="72.5" cy="75.9" r="1.2"/><circle cx="82.7" cy="71.0" r="1.2"/><circle cx="73.0" cy="103.4" r="1.2"/><circle cx="48.3" cy="100.2" r="1.2"/><circle cx="61.4" cy="47.4" r="1.2"/><circle cx="72.2" cy="127.2" r="1.2"/><circle cx="85.2" cy="100.5" r="1.2"/><circle cx="35.5" cy="58.1" r="1.2"/><circle cx="80.3" cy="58.5" r="1.2"/><circle cx="47.9" cy="110.5" r="1.2"/><circle cx="48.2" cy="88.0" r="1.2"/><circle cx="38.1" cy="101.4" r="1.2"/><circle cx="38.2" cy="134.5" r="1.2"/><circle cx="70.9" cy="50.6" r="1.2"/><circle cx="81.3" cy="45.7" r="1.2"/><circle cx="50.3" cy="121.8" r="1.2"/><circle cx="26.3" cy="117.5" r="1.2"/><circle cx="29.7" cy="28.4" r="1.2"/><circle cx="83.1" cy="111.3" r="1.2"/></g>
+              <use href="#kidney" fill="none" stroke="#8FE0FF" stroke-width="1.4" stroke-opacity=".9" filter="url(#glow)"/>
+          </g>
+
+          <!-- 남은 신장 (오른쪽) -->
+          <g transform="translate(250 70)">
+              <use href="#kidney" fill="url(#kFill)"/>
+              <path d="M55.0 4.0L65.8 5.9M55.0 4.0L44.1 5.5M55.0 4.0L49.5 20.8M55.0 4.0L62.2 16.2M65.8 5.9L75.0 11.7M65.8 5.9L62.2 16.2M75.0 11.7L81.7 20.4M75.0 11.7L71.2 27.7M75.0 11.7L62.2 16.2M81.7 20.4L86.1 30.5M81.7 20.4L71.2 27.7M86.1 30.5L89.0 41.1M86.1 30.5L71.2 27.7M86.1 30.5L72.7 40.3M86.1 30.5L81.3 45.7M89.0 41.1L90.8 51.9M89.0 41.1L81.3 45.7M90.8 51.9L91.7 62.9M90.8 51.9L80.3 58.5M90.8 51.9L81.3 45.7M91.7 62.9L92.0 73.9M91.7 62.9L82.7 71.0M91.7 62.9L80.3 58.5M92.0 73.9L91.8 84.9M92.0 73.9L84.9 81.2M92.0 73.9L82.7 71.0M91.8 84.9L91.0 95.9M91.8 84.9L77.6 88.1M91.8 84.9L84.9 81.2M91.0 95.9L89.4 106.7M91.0 95.9L77.6 88.1M91.0 95.9L85.2 100.5M89.4 106.7L86.8 117.4M89.4 106.7L85.2 100.5M89.4 106.7L83.1 111.3M86.8 117.4L82.7 127.6M86.8 117.4L73.9 115.8M86.8 117.4L83.1 111.3M82.7 127.6L76.6 136.7M82.7 127.6L73.9 115.8M82.7 127.6L72.2 127.2M76.6 136.7L67.8 143.2M76.6 136.7L72.2 127.2M67.8 143.2L57.2 145.9M67.8 143.2L58.6 131.8M67.8 143.2L72.2 127.2M57.2 145.9L46.3 145.1M57.2 145.9L48.4 132.9M57.2 145.9L58.6 131.8M46.3 145.1L36.1 141.2M46.3 145.1L48.4 132.9M46.3 145.1L38.2 134.5M36.1 141.2L27.5 134.3M36.1 141.2L38.2 134.5M27.5 134.3L21.1 125.4M27.5 134.3L35.9 122.6M27.5 134.3L38.2 134.5M21.1 125.4L17.2 115.1M21.1 125.4L35.9 122.6M21.1 125.4L26.3 117.5M17.2 115.1L16.2 104.3M17.2 115.1L22.2 108.3M17.2 115.1L26.3 117.5M16.2 104.3L21.5 94.8M16.2 104.3L22.2 108.3M21.5 94.8L28.6 86.4M21.5 94.8L37.2 90.8M21.5 94.8L22.2 108.3M21.5 94.8L38.1 101.4M28.6 86.4L32.2 76.1M28.6 86.4L37.2 90.8M28.6 86.4L42.6 79.6M32.2 76.1L29.8 65.5M32.2 76.1L42.6 79.6M32.2 76.1L45.8 67.7M29.8 65.5L23.0 56.9M29.8 65.5L45.8 67.7M29.8 65.5L35.5 58.1M23.0 56.9L16.8 47.9M23.0 56.9L28.2 49.5M23.0 56.9L35.5 58.1M16.8 47.9L16.7 37.0M16.8 47.9L28.2 49.5M16.8 47.9L28.4 39.0M16.7 37.0L20.2 26.6M16.7 37.0L28.4 39.0M20.2 26.6L26.0 17.3M20.2 26.6L28.4 39.0M20.2 26.6L29.7 28.4M26.0 17.3L34.2 10.0M26.0 17.3L35.1 19.4M26.0 17.3L29.7 28.4M34.2 10.0L44.1 5.5M34.2 10.0L35.1 19.4M44.1 5.5L49.5 20.8M44.1 5.5L35.1 19.4M37.2 90.8L42.6 79.6M37.2 90.8L48.3 100.2M37.2 90.8L48.2 88.0M37.2 90.8L38.1 101.4M28.2 49.5L28.4 39.0M28.2 49.5L45.3 47.5M28.2 49.5L35.5 58.1M28.4 39.0L45.3 47.5M28.4 39.0L41.3 32.6M28.4 39.0L29.7 28.4M73.9 115.8L58.4 114.8M73.9 115.8L73.0 103.4M73.9 115.8L72.2 127.2M73.9 115.8L83.1 111.3M57.6 71.1L47.8 57.3M57.6 71.1L67.6 60.3M57.6 71.1L62.9 85.8M57.6 71.1L42.6 79.6M57.6 71.1L45.8 67.7M57.6 71.1L72.5 75.9M57.6 71.1L48.2 88.0M22.2 108.3L34.1 110.9M22.2 108.3L38.1 101.4M22.2 108.3L26.3 117.5M35.9 122.6L48.4 132.9M35.9 122.6L34.1 110.9M35.9 122.6L47.9 110.5M35.9 122.6L38.2 134.5M35.9 122.6L50.3 121.8M35.9 122.6L26.3 117.5M47.8 57.3L67.6 60.3M47.8 57.3L45.3 47.5M47.8 57.3L45.8 67.7M47.8 57.3L61.4 47.4M47.8 57.3L35.5 58.1M58.4 114.8L61.3 99.8M58.4 114.8L58.6 131.8M58.4 114.8L73.0 103.4M58.4 114.8L72.2 127.2M58.4 114.8L47.9 110.5M58.4 114.8L50.3 121.8M77.6 88.1L62.9 85.8M77.6 88.1L61.3 99.8M77.6 88.1L84.9 81.2M77.6 88.1L72.5 75.9M77.6 88.1L73.0 103.4M77.6 88.1L85.2 100.5M67.6 60.3L72.5 75.9M67.6 60.3L82.7 71.0M67.6 60.3L61.4 47.4M67.6 60.3L80.3 58.5M67.6 60.3L70.9 50.6M62.9 85.8L61.3 99.8M62.9 85.8L72.5 75.9M62.9 85.8L48.2 88.0M42.6 79.6L45.8 67.7M42.6 79.6L48.2 88.0M49.5 20.8L35.1 19.4M49.5 20.8L57.9 35.2M49.5 20.8L62.2 16.2M49.5 20.8L41.3 32.6M71.2 27.7L57.9 35.2M71.2 27.7L62.2 16.2M71.2 27.7L72.7 40.3M48.4 132.9L58.6 131.8M48.4 132.9L38.2 134.5M48.4 132.9L50.3 121.8M45.3 47.5L57.9 35.2M45.3 47.5L41.3 32.6M45.3 47.5L61.4 47.4M45.3 47.5L35.5 58.1M61.3 99.8L73.0 103.4M61.3 99.8L48.3 100.2M61.3 99.8L47.9 110.5M61.3 99.8L48.2 88.0M35.1 19.4L41.3 32.6M35.1 19.4L29.7 28.4M34.1 110.9L47.9 110.5M34.1 110.9L38.1 101.4M34.1 110.9L26.3 117.5M58.6 131.8L72.2 127.2M58.6 131.8L50.3 121.8M45.8 67.7L35.5 58.1M84.9 81.2L72.5 75.9M84.9 81.2L82.7 71.0M57.9 35.2L62.2 16.2M57.9 35.2L72.7 40.3M57.9 35.2L41.3 32.6M57.9 35.2L61.4 47.4M72.7 40.3L61.4 47.4M72.7 40.3L70.9 50.6M72.7 40.3L81.3 45.7M41.3 32.6L29.7 28.4M72.5 75.9L82.7 71.0M82.7 71.0L80.3 58.5M73.0 103.4L85.2 100.5M73.0 103.4L83.1 111.3M48.3 100.2L47.9 110.5M48.3 100.2L48.2 88.0M48.3 100.2L38.1 101.4M61.4 47.4L70.9 50.6M85.2 100.5L83.1 111.3M80.3 58.5L70.9 50.6M80.3 58.5L81.3 45.7M47.9 110.5L38.1 101.4M47.9 110.5L50.3 121.8M70.9 50.6L81.3 45.7" fill="none" stroke="#9FE3FF" stroke-opacity=".38" stroke-width=".6"/>
+              <g fill="#DDF6FF" filter="url(#glow)" class="twinkle"><circle cx="55.0" cy="4.0" r="1.6"/><circle cx="65.8" cy="5.9" r="1.6"/><circle cx="75.0" cy="11.7" r="1.6"/><circle cx="81.7" cy="20.4" r="1.6"/><circle cx="86.1" cy="30.5" r="1.6"/><circle cx="89.0" cy="41.1" r="1.6"/><circle cx="90.8" cy="51.9" r="1.6"/><circle cx="91.7" cy="62.9" r="1.6"/><circle cx="92.0" cy="73.9" r="1.6"/><circle cx="91.8" cy="84.9" r="1.6"/><circle cx="91.0" cy="95.9" r="1.6"/><circle cx="89.4" cy="106.7" r="1.6"/><circle cx="86.8" cy="117.4" r="1.6"/><circle cx="82.7" cy="127.6" r="1.6"/><circle cx="76.6" cy="136.7" r="1.6"/><circle cx="67.8" cy="143.2" r="1.6"/><circle cx="57.2" cy="145.9" r="1.6"/><circle cx="46.3" cy="145.1" r="1.6"/><circle cx="36.1" cy="141.2" r="1.6"/><circle cx="27.5" cy="134.3" r="1.6"/><circle cx="21.1" cy="125.4" r="1.6"/><circle cx="17.2" cy="115.1" r="1.6"/><circle cx="16.2" cy="104.3" r="1.6"/><circle cx="21.5" cy="94.8" r="1.6"/><circle cx="28.6" cy="86.4" r="1.6"/><circle cx="32.2" cy="76.1" r="1.6"/><circle cx="29.8" cy="65.5" r="1.6"/><circle cx="23.0" cy="56.9" r="1.6"/><circle cx="16.8" cy="47.9" r="1.6"/><circle cx="16.7" cy="37.0" r="1.6"/><circle cx="20.2" cy="26.6" r="1.6"/><circle cx="26.0" cy="17.3" r="1.6"/><circle cx="34.2" cy="10.0" r="1.6"/><circle cx="44.1" cy="5.5" r="1.6"/><circle cx="37.2" cy="90.8" r="1.2"/><circle cx="28.2" cy="49.5" r="1.2"/><circle cx="28.4" cy="39.0" r="1.2"/><circle cx="73.9" cy="115.8" r="1.2"/><circle cx="57.6" cy="71.1" r="1.2"/><circle cx="22.2" cy="108.3" r="1.2"/><circle cx="35.9" cy="122.6" r="1.2"/><circle cx="47.8" cy="57.3" r="1.2"/><circle cx="58.4" cy="114.8" r="1.2"/><circle cx="77.6" cy="88.1" r="1.2"/><circle cx="67.6" cy="60.3" r="1.2"/><circle cx="62.9" cy="85.8" r="1.2"/><circle cx="42.6" cy="79.6" r="1.2"/><circle cx="49.5" cy="20.8" r="1.2"/><circle cx="71.2" cy="27.7" r="1.2"/><circle cx="48.4" cy="132.9" r="1.2"/><circle cx="45.3" cy="47.5" r="1.2"/><circle cx="61.3" cy="99.8" r="1.2"/><circle cx="35.1" cy="19.4" r="1.2"/><circle cx="34.1" cy="110.9" r="1.2"/><circle cx="58.6" cy="131.8" r="1.2"/><circle cx="45.8" cy="67.7" r="1.2"/><circle cx="84.9" cy="81.2" r="1.2"/><circle cx="57.9" cy="35.2" r="1.2"/><circle cx="62.2" cy="16.2" r="1.2"/><circle cx="72.7" cy="40.3" r="1.2"/><circle cx="41.3" cy="32.6" r="1.2"/><circle cx="72.5" cy="75.9" r="1.2"/><circle cx="82.7" cy="71.0" r="1.2"/><circle cx="73.0" cy="103.4" r="1.2"/><circle cx="48.3" cy="100.2" r="1.2"/><circle cx="61.4" cy="47.4" r="1.2"/><circle cx="72.2" cy="127.2" r="1.2"/><circle cx="85.2" cy="100.5" r="1.2"/><circle cx="35.5" cy="58.1" r="1.2"/><circle cx="80.3" cy="58.5" r="1.2"/><circle cx="47.9" cy="110.5" r="1.2"/><circle cx="48.2" cy="88.0" r="1.2"/><circle cx="38.1" cy="101.4" r="1.2"/><circle cx="38.2" cy="134.5" r="1.2"/><circle cx="70.9" cy="50.6" r="1.2"/><circle cx="81.3" cy="45.7" r="1.2"/><circle cx="50.3" cy="121.8" r="1.2"/><circle cx="26.3" cy="117.5" r="1.2"/><circle cx="29.7" cy="28.4" r="1.2"/><circle cx="83.1" cy="111.3" r="1.2"/></g>
+              <use href="#kidney" fill="none" stroke="#8FE0FF" stroke-width="1.4" stroke-opacity=".9" filter="url(#glow)"/>
+          </g>
+          <circle id="hilumGlow" cx="282" cy="146" r="30" fill="url(#hilumCool)" class="glow"/>
+
+          <!-- 남은 신장을 도는 빛 궤도 -->
+          <g fill="none" stroke="url(#ringGrad)" stroke-linecap="round" filter="url(#glow)">
+            <ellipse cx="304" cy="150" rx="82" ry="20" transform="rotate(-18 304 150)" stroke-width="1.8"
+                     pathLength="400" stroke-dasharray="110 290" class="orbit"/>
+            <ellipse cx="304" cy="140" rx="76" ry="15" transform="rotate(24 304 140)" stroke-width="1.3"
+                     pathLength="400" stroke-dasharray="80 320" class="orbit rev"/>
+          </g>
+
+          <!-- 설명 -->
+          <text x="24" y="24" font-size="12" fill="#9FB4D9" font-family="Pretendard, sans-serif">기증한 신장</text>
+          <text x="24" y="38" font-size="11" fill="#6F86B3" font-family="Pretendard, sans-serif" id="donatedDate"></text>
+          <line x1="80" y1="44" x2="96" y2="80" stroke="#8FBEFF" stroke-opacity=".3" stroke-width="1"/>
+          <text x="396" y="24" text-anchor="end" font-size="12" font-weight="700" fill="#FFFFFF" font-family="Pretendard, sans-serif">남은 신장</text>
+          <text x="396" y="38" text-anchor="end" font-size="11" fill="#8FE0FF" font-family="Pretendard, sans-serif" id="remainEgfr"></text>
+          <line x1="372" y1="44" x2="334" y2="80" stroke="#8FE0FF" stroke-opacity=".55" stroke-width="1"/>
+          <circle cx="334" cy="80" r="2.6" fill="#BFF0FF" filter="url(#glow)"/>
+          <text x="210" y="298" text-anchor="middle" font-size="10" fill="#6F86B3" font-family="Pretendard, sans-serif" id="hilumNote"></text>
+        </svg>
+      </div>
+      <div class="hero-stats">
+        <div class="tile">
+          <div class="label">기증 후</div>
+          <div class="num" id="statDays">-</div>
+          <div class="sub" id="statDaysSub"></div>
+        </div>
+        <div class="tile">
+          <div class="label">최근 혈압</div>
+          <div class="num" id="statBp">-</div>
+          <div class="sub" id="statBpSub"></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- eGFR -->
+    <article class="egfr chart-card">
+      <div class="chart-top">
+        <div>
+          <div class="card-title">나의 기준값 · eGFR</div>
+          <div class="meta" id="percentSub"></div>
+        </div>
+        <svg class="ring" viewBox="0 0 84 84" id="ring"></svg>
+      </div>
+      <div class="chart-box"><canvas id="egfrChart"></canvas></div>
+      <p class="fine">보통 기증 후 1년 무렵 기증 전의 60~70%에서 안정됩니다 · 위치만 표시하며 판단은 의료진과 상담하세요</p>
+    </article>
+
+    <!-- 혈압 -->
+    <article class="bp chart-card">
+      <div class="chart-top">
+        <div>
+          <div class="card-title">혈압 추이</div>
+          <div class="meta" id="bpSub"></div>
+        </div>
+        <div class="big" id="bp">-</div>
+      </div>
+      <div class="chart-box"><canvas id="bpChart"></canvas></div>
+    </article>
+
+    <!-- 사이드 -->
+    <aside class="side">
+      <article class="next">
+        <div class="label">다음 추적검사</div>
+        <div class="dday" id="statVisit">-</div>
+        <div class="sub" id="statVisitSub"></div>
+        <div class="flag" id="statVisitFlag"></div>
+      </article>
+      <article class="journey">
+        <span class="card-title">기증 후 여정</span>
+        <ul class="visit-list" id="timeline"></ul>
+      </article>
+    </aside>
+
+  </div>
+</main>
+
+<!-- 기록 입력 창 -->
+<dialog id="formDialog">
   <article>
-    <h2>측정값 입력</h2>
+    <header>
+      <button aria-label="닫기" rel="prev" id="closeForm"></button>
+      <strong>측정값 기록</strong>
+    </header>
     <form id="form">
       <label>측정 날짜 <input type="date" name="measured_at" required></label>
       <small>같은 날짜로 다시 저장하면 그날 기록이 새 값으로 바뀝니다.</small>
@@ -46,87 +394,239 @@
         </label>
       </div>
       <button type="submit">저장</button>
+      <p id="msg"></p>
     </form>
-    <p id="msg"></p>
   </article>
+</dialog>
 
-  <article><h2>혈압 추이</h2><canvas id="bpChart"></canvas></article>
-  <article><h2>eGFR 추이</h2><canvas id="egfrChart"></canvas></article>
+<!-- 전체 기록 창 -->
+<dialog id="recordsDialog">
   <article>
-    <h2>기록 표</h2>
+    <header>
+      <button aria-label="닫기" rel="prev" id="closeRecords"></button>
+      <strong>전체 기록</strong>
+    </header>
     <div class="overflow-auto"><table id="table"></table></div>
   </article>
-</main>
+</dialog>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const num = (v) => (v === "" || v === null ? null : Number(v));
+const DAY = 86400000;
+const STATUS_LABEL = { done: "완료", missed: "놓침", window: "검사 기간", upcoming: "예정" };
+const COLOR = { blue: "#3F6FE0", blue2: "#9DB7F5", warn: "#E06A4F", muted: "#8792A6", grid: "#EEF2F7", navy: "#17233D" };
 let bpChart, egfrChart;
 
 // 오늘 날짜 (한국 시간 기준, YYYY-MM-DD)
 const now = new Date();
-const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-  .toISOString().slice(0, 10);
+const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const dateInput = document.querySelector("[name=measured_at]");
 dateInput.value = today;
-dateInput.max = today;              // 미래 날짜 선택 불가
+dateInput.max = today;
+const daysUntil = (d) => Math.round((new Date(d) - new Date(today)) / DAY);
+const dot = (d) => d.replaceAll("-", ".");
+
+Chart.defaults.font.family = "Pretendard, sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = COLOR.muted;
+Chart.defaults.plugins.tooltip.backgroundColor = COLOR.navy;
+Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.cornerRadius = 10;
+const timeAxis = {
+  type: "time",
+  grid: { display: false },
+  border: { display: false },
+  ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 7 },
+  time: { tooltipFormat: "yyyy-MM-dd", displayFormats: { day: "MM.dd", month: "yy.MM" } },
+};
+const yAxis = (min, max) => ({ min, max, grid: { color: COLOR.grid }, border: { display: false }, ticks: { maxTicksLimit: 6 } });
+const legend = { align: "end", labels: { boxWidth: 7, boxHeight: 7, usePointStyle: true, padding: 14, filter: (i) => !i.text.startsWith("_") } };
+const fadeFill = (rgb) => (ctx) => {
+  const { chart } = ctx;
+  if (!chart.chartArea) return "transparent";
+  const g = chart.ctx.createLinearGradient(0, chart.chartArea.top, 0, chart.chartArea.bottom);
+  g.addColorStop(0, `rgba(${rgb}, .22)`);
+  g.addColorStop(1, `rgba(${rgb}, 0)`);
+  return g;
+};
+const points = (color) => ({ pointRadius: 3.5, pointHoverRadius: 6, pointBackgroundColor: "#fff", pointBorderColor: color, pointBorderWidth: 2 });
 
 function showMsg(text, ok) {
   $("msg").textContent = text;
   $("msg").className = ok ? "ok" : "err";
 }
 
-// 날짜 간격이 실제 일수대로 그려지는 가로축
-const timeAxis = {
-  type: "time",
-  time: { unit: "day", tooltipFormat: "yyyy-MM-dd", displayFormats: { day: "MM-dd" } },
-};
-
-// 기록 불러오기
-async function load() {
-  const code = $("donorCode").value.trim();
+// ---------- 전체 불러오기 ----------
+async function loadAll() {
+  const code = encodeURIComponent($("donorCode").value.trim());
   try {
-    const res = await fetch(`/donors/${encodeURIComponent(code)}/measurements`);
-    render(res.ok ? await res.json() : []);
+    const [sRes, mRes] = await Promise.all([
+      fetch(`/donors/${code}/summary`),
+      fetch(`/donors/${code}/measurements`),
+    ]);
+    if (!sRes.ok) { $("todayStatus").textContent = "공여자 코드를 찾을 수 없습니다"; return; }
+    const s = await sRes.json();
+    const rows = mRes.ok ? await mRes.json() : [];
+    renderHeader(s, rows);
+    renderHero(s, rows);
+    renderNext(s);
+    renderTimeline(s.visits);
+    renderRing(s);
+    renderBaseline(s, rows);
+    renderBp(rows);
+    renderTable(rows);
   } catch {
-    showMsg("서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.", false);
+    $("todayStatus").textContent = "서버에 연결할 수 없습니다";
   }
 }
 
-// 그래프와 표 그리기
-function render(rows) {
-  const point = (key) => rows.map((r) => ({ x: r.measured_at, y: r[key] }));
-  if (bpChart) bpChart.destroy();
-  if (egfrChart) egfrChart.destroy();
+// ---------- 상단 ----------
+function renderHeader(s, rows) {
+  $("avatar").textContent = s.donor_code.replace("-", "").slice(0, 3);
+  $("whoName").textContent = s.donor_code;
+  $("whoSub").textContent = `기증 후 ${s.days_since_donation}일`;
+  const recordedToday = rows.some((r) => r.measured_at === today);
+  $("todayStatus").textContent = recordedToday ? "✓ 오늘 기록 완료" : "오늘 기록 전";
+  $("todayStatus").className = recordedToday ? "done" : "";
+}
 
-  bpChart = new Chart($("bpChart"), {
-    type: "line",
-    data: { datasets: [
-      { label: "수축기", data: point("systolic_bp") },
-      { label: "이완기", data: point("diastolic_bp") },
-    ]},
-    options: { scales: { x: timeAxis, y: { min: 40, max: 200 } } },
+// ---------- 히어로 ----------
+function renderHero(s, rows) {
+  $("statDays").innerHTML = `${s.days_since_donation}<small>일째</small>`;
+  $("statDaysSub").textContent = `기증일 ${dot(s.donation_date)}`;
+  $("donatedDate").textContent = dot(s.donation_date);
+  $("remainEgfr").textContent = s.latest_egfr != null ? `eGFR ${s.latest_egfr}` : "eGFR 기록 없음";
+  // 놓친 추적검사가 있으면 남은 신장에 붉은 빛, 없으면 푸른 빛
+  const attention = s.visits.some((v) => v.status === "missed");
+  $("hilumGlow").setAttribute("fill", attention ? "url(#hilumWarm)" : "url(#hilumCool)");
+  $("hilumNote").textContent = attention ? "붉은 빛 · 확인이 필요한 일정이 있어요" : "";
+
+  const lastBp = [...rows].reverse().find((r) => r.systolic_bp != null);
+  $("statBp").innerHTML = lastBp ? `${lastBp.systolic_bp}/${lastBp.diastolic_bp ?? "-"}<small>mmHg</small>` : "-";
+  $("statBpSub").textContent = lastBp ? `${dot(lastBp.measured_at)} 측정` : "기록 없음";
+}
+
+// ---------- 다음 추적검사 ----------
+function renderNext(s) {
+  const missed = s.visits.filter((v) => v.status === "missed");
+  const inWindow = s.visits.find((v) => v.status === "window");
+  const next = s.visits.find((v) => v.status === "upcoming");
+  const target = inWindow || next;
+  $("statVisit").textContent = target ? (inWindow ? "검사 기간" : `D-${daysUntil(target.due_date)}`) : "-";
+  $("statVisitSub").textContent = target ? `${target.visit_name} · ${dot(target.due_date)}` : "등록된 일정 없음";
+  const flag = $("statVisitFlag");
+  flag.className = "flag";
+  if (missed.length) {
+    flag.textContent = `${missed.map((v) => v.visit_name.replace("기증 후 ", "")).join(", ")} 검사 미완료 · 이식센터에 연락해 주세요`;
+  } else if (inWindow) {
+    flag.classList.add("amber");
+    flag.textContent = "예정일 앞뒤 60일 안에 받아 주세요";
+  } else {
+    flag.textContent = "";
+  }
+}
+
+// ---------- 여정 목록 ----------
+function renderTimeline(visits) {
+  $("timeline").innerHTML = visits.map((v) => {
+    const short = v.visit_name.replace("기증 후 ", "");
+    const icon = short.replace("개월", "M").replace("년", "Y");
+    const sub = {
+      done: `${dot(v.completed_date || v.due_date)} 검사함`,
+      missed: `${dot(v.due_date)} 예정이었음`,
+      window: `${dot(v.due_date)} 예정`,
+      upcoming: `${dot(v.due_date)} · D-${daysUntil(v.due_date)}`,
+    }[v.status];
+    return `<li class="${v.status}">
+      <span class="v-icon">${icon}</span>
+      <span class="v-text"><b>${short}</b><span>${sub}</span></span>
+      <span class="status">${STATUS_LABEL[v.status]}</span></li>`;
+  }).join("") || "<li>등록된 추적검사 일정이 없습니다.</li>";
+}
+
+// ---------- 기준값 링 ----------
+function renderRing(s) {
+  const p = s.egfr_percent_of_predonation;
+  const R = 34, C = 2 * Math.PI * R;
+  const arc = (from, to, color, w) =>
+    `<circle cx="42" cy="42" r="${R}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round"
+      stroke-dasharray="${(C * (to - from)) / 100} ${C}" stroke-dashoffset="${(-C * from) / 100}" transform="rotate(-90 42 42)"/>`;
+  let svg = `<circle cx="42" cy="42" r="${R}" fill="none" stroke="#EEF2F7" stroke-width="8"/>`;
+  svg += arc(60, 70, "#C9D8FA", 8);
+  if (p != null) svg += arc(0, Math.min(p, 100), COLOR.blue, 4);
+  svg += `<text x="42" y="42" text-anchor="middle" font-size="17" font-weight="800" fill="${COLOR.navy}">${p != null ? p + "%" : "-"}</text>
+          <text x="42" y="56" text-anchor="middle" font-size="8.5" fill="${COLOR.muted}">기증 전 대비</text>`;
+  $("ring").innerHTML = svg;
+  $("percentSub").textContent = s.predonation_egfr
+    ? `기증 전 ${s.predonation_egfr} → 최근 ${s.latest_egfr ?? "-"}`
+    : "기증 전 eGFR 미등록";
+}
+
+// ---------- eGFR 그래프 ----------
+function renderBaseline(s, rows) {
+  if (egfrChart) egfrChart.destroy();
+  const pre = s.predonation_egfr;
+  const datasets = [];
+  if (pre) {
+    const flat = (r) => [{ x: s.donation_date, y: pre * r }, { x: today, y: pre * r }];
+    datasets.push(
+      { label: "예상 범위 60~70%", data: flat(0.7), borderWidth: 0, pointRadius: 0, fill: "+1",
+        backgroundColor: "rgba(110,149,242,0.14)", pointStyle: "rect" },
+      { label: "_band_low", data: flat(0.6), borderWidth: 0, pointRadius: 0, fill: false },
+      { label: "기증 전", data: flat(1), borderColor: "#B9C5D8", borderDash: [4, 4], borderWidth: 1, pointRadius: 0, pointStyle: "line" },
+    );
+  }
+  datasets.push({
+    label: "나의 eGFR",
+    data: rows.filter((r) => r.egfr != null).map((r) => ({ x: r.measured_at, y: r.egfr })),
+    borderColor: COLOR.blue, backgroundColor: fadeFill("63, 111, 224"), fill: "origin",
+    borderWidth: 2.4, tension: 0.4, ...points(COLOR.blue),
   });
   egfrChart = new Chart($("egfrChart"), {
     type: "line",
-    data: { datasets: [{ label: "eGFR", data: point("egfr") }] },
-    options: { scales: { x: timeAxis, y: { min: 0, max: 120 } } },
+    data: { datasets },
+    options: { maintainAspectRatio: false, scales: { x: timeAxis, y: yAxis(0, Math.max(120, (pre || 0) + 15)) }, plugins: { legend } },
   });
+}
 
-  if (rows.length === 0) {
-    $("table").innerHTML = "<tr><td>아직 기록이 없습니다.</td></tr>";
-    return;
-  }
-  const head = "<tr><th>날짜</th><th>혈압</th><th>체중</th><th>크레아티닌</th><th>eGFR</th><th>소변 단백</th></tr>";
-  const body = rows.map((r) =>
+// ---------- 혈압 그래프 ----------
+function renderBp(rows) {
+  if (bpChart) bpChart.destroy();
+  const lastBp = [...rows].reverse().find((r) => r.systolic_bp != null);
+  $("bp").textContent = lastBp ? `${lastBp.systolic_bp}/${lastBp.diastolic_bp ?? "-"}` : "-";
+  $("bpSub").textContent = lastBp ? `최근 ${dot(lastBp.measured_at)} · mmHg` : "기록 없음";
+  const point = (key) => rows.map((r) => ({ x: r.measured_at, y: r[key] }));
+  bpChart = new Chart($("bpChart"), {
+    type: "line",
+    data: { datasets: [
+      { label: "수축기", data: point("systolic_bp"), borderColor: COLOR.blue, backgroundColor: COLOR.blue, borderWidth: 2.2, tension: 0.4, ...points(COLOR.blue) },
+      { label: "이완기", data: point("diastolic_bp"), borderColor: COLOR.blue2, backgroundColor: COLOR.blue2, borderWidth: 2.2, tension: 0.4, ...points(COLOR.blue2) },
+    ]},
+    options: { maintainAspectRatio: false, scales: { x: timeAxis, y: yAxis(40, 200) }, plugins: { legend } },
+  });
+}
+
+// ---------- 전체 기록 ----------
+function renderTable(rows) {
+  if (rows.length === 0) { $("table").innerHTML = "<tr><td>아직 기록이 없습니다.</td></tr>"; return; }
+  const head = "<tr><th>날짜</th><th>혈압</th><th>eGFR</th><th>크레아티닌</th><th>체중</th><th>소변 단백</th></tr>";
+  const body = [...rows].reverse().map((r) =>
     `<tr><td>${r.measured_at}</td><td>${r.systolic_bp ?? "-"}/${r.diastolic_bp ?? "-"}</td>` +
-    `<td>${r.weight_kg ?? "-"}</td><td>${r.creatinine ?? "-"}</td>` +
-    `<td>${r.egfr ?? "-"}</td><td>${r.urine_protein ?? "-"}</td></tr>`
+    `<td>${r.egfr ?? "-"}</td><td>${r.creatinine ?? "-"}</td>` +
+    `<td>${r.weight_kg ?? "-"}</td><td>${r.urine_protein ?? "-"}</td></tr>`
   ).join("");
   $("table").innerHTML = head + body;
 }
 
-// 저장
+// ---------- 창 열기/닫기 ----------
+$("openForm").addEventListener("click", () => { showMsg("", true); $("formDialog").showModal(); });
+$("closeForm").addEventListener("click", () => $("formDialog").close());
+$("openRecords").addEventListener("click", () => $("recordsDialog").showModal());
+$("closeRecords").addEventListener("click", () => $("recordsDialog").close());
+$("donorCode").addEventListener("change", loadAll);
+
+// ---------- 저장 ----------
 $("form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
@@ -141,20 +641,15 @@ $("form").addEventListener("submit", async (e) => {
     urine_protein: f.get("urine_protein"),
   };
   try {
-    const res = await fetch("/measurements", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const res = await fetch("/measurements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (res.ok) {
       const data = await res.json();
-      showMsg(data.updated ? "기존 기록을 새 값으로 바꿨습니다." : "저장되었습니다.", true);
-      load();
+      $("formDialog").close();
+      $("todayStatus").textContent = data.updated ? "기존 기록을 바꿨습니다" : "저장되었습니다";
+      loadAll();
     } else {
       const err = await res.json();
-      const detail = typeof err.detail === "string"
-        ? err.detail
-        : err.detail.map((d) => d.msg).join(", ");
+      const detail = typeof err.detail === "string" ? err.detail : err.detail.map((d) => d.msg).join(", ");
       showMsg("저장 실패: " + detail, false);
     }
   } catch {
@@ -162,8 +657,7 @@ $("form").addEventListener("submit", async (e) => {
   }
 });
 
-$("loadBtn").addEventListener("click", load);
-load();
+loadAll();
 </script>
 </body>
 </html>

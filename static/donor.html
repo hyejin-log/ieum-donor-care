@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#EDF1F6">
+  <title>이음 · 나의 건강 노트</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    :root {
+      --bg: #EDF1F6; --card: #FFFFFF; --soft: #F4F7FB; --line: #E3E9F1;
+      --navy: #17233D; --ink: #22304A; --muted: #8792A6;
+      --blue: #3F6FE0; --blue-2: #6E95F2; --blue-soft: #E3EBFC;
+      --warn: #E06A4F; --warn-soft: #FCE9E4;
+      --amber: #C98A1B; --amber-soft: #FBF1DD;
+      --ok: #2E9E7A; --ok-soft: #E1F4EE;
+      --shadow: 0 1px 2px rgba(23, 35, 61, .04), 0 10px 28px rgba(23, 35, 61, .06);
+    }
+    :root[data-theme=light] {
+      --pico-background-color: var(--bg);
+      --pico-color: var(--ink);
+      --pico-primary: var(--blue);
+      --pico-primary-background: var(--navy);
+      --pico-primary-border: var(--navy);
+      --pico-primary-hover-background: #0f1a2f;
+      --pico-primary-hover-border: #0f1a2f;
+      --pico-font-family: "Pretendard", system-ui, sans-serif;
+      --pico-card-background-color: var(--card);
+      --pico-card-box-shadow: none;
+      --pico-block-spacing-vertical: 1.1rem;
+      --pico-block-spacing-horizontal: 1.2rem;
+    }
+    body { background: var(--bg); }
+    main { max-width: 480px; margin: 0 auto; padding: 14px 16px 28px; }
+    article { background: var(--card); border: none; border-radius: 22px; box-shadow: var(--shadow); margin: 0 0 14px; }
+    .label { font-size: .72rem; color: var(--muted); font-weight: 600; letter-spacing: .06em; }
+    .title { font-size: .95rem; font-weight: 700; color: var(--navy); }
+
+    /* 상단 */
+    .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--navy); }
+    .logo i { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, var(--blue-2), var(--blue)); display: inline-block; }
+    .bell { position: relative; width: 42px; height: 42px; border-radius: 50%; background: var(--card); box-shadow: var(--shadow);
+            display: grid; place-items: center; border: none; padding: 0; margin: 0; cursor: pointer; color: var(--navy); }
+    .bell svg { width: 20px; height: 20px; }
+    .badge { position: absolute; top: 4px; right: 4px; min-width: 17px; height: 17px; border-radius: 999px; background: var(--warn);
+             color: #fff; font-size: .62rem; font-weight: 800; display: grid; place-items: center; padding: 0 4px; }
+    .badge:empty { display: none; }
+
+    .hello { margin: 4px 4px 14px; }
+    .hello h1 { font-size: 1.35rem; margin: 0; color: var(--navy); font-weight: 800; line-height: 1.35; }
+    .hello h1 span { color: var(--blue); }
+    .hello p { margin: 2px 0 0; color: var(--muted); font-size: .85rem; }
+
+    /* 알림 띠 */
+    .banner { display: flex; gap: 10px; align-items: flex-start; border-radius: 18px; padding: 12px 14px; margin-bottom: 14px; font-size: .86rem; }
+    .banner b { display: block; font-size: .9rem; }
+    .banner span { color: inherit; opacity: .85; }
+    .banner::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-top: 6px; flex: none; }
+    .banner.urgent { background: var(--warn-soft); color: #A63E26; }
+    .banner.warn { background: var(--amber-soft); color: #8A5B0A; }
+    .banner:empty { display: none; }
+
+    /* 이번 주 기록 */
+    .week { background: linear-gradient(135deg, #2F5BD0 0%, #5A86EE 100%); color: #fff; }
+    .week .label { color: rgba(255, 255, 255, .75); }
+    .week-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-top: 4px; }
+    .week h2 { margin: 0; color: #fff; font-size: 1.35rem; font-weight: 800; }
+    .week p { margin: 2px 0 0; font-size: .82rem; color: rgba(255, 255, 255, .8); }
+    .week button { margin: 0; width: auto; background: #fff; color: var(--blue); border: none; border-radius: 999px; padding: 10px 16px; font-weight: 700; font-size: .85rem; white-space: nowrap; }
+    .dots { display: flex; gap: 6px; margin-top: 14px; }
+    .dots i { flex: 1; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .25); }
+    .dots i.on { background: #fff; }
+    .dots-cap { display: flex; justify-content: space-between; font-size: .68rem; color: rgba(255, 255, 255, .7); margin-top: 6px; }
+
+    /* 다음 검사 */
+    .next-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .dday { font-size: 2rem; font-weight: 800; color: var(--navy); line-height: 1.1; }
+    .next-sub { font-size: .82rem; color: var(--muted); margin-top: 2px; }
+    .steps { display: flex; gap: 6px; margin-top: 14px; }
+    .step { flex: 1; text-align: center; font-size: .7rem; font-weight: 700; padding: 8px 4px; border-radius: 12px; background: var(--soft); color: var(--muted); }
+    .step.done { background: var(--ok-soft); color: var(--ok); }
+    .step.missed { background: var(--warn-soft); color: var(--warn); }
+    .step.window { background: var(--amber-soft); color: var(--amber); }
+
+    /* 혈압 */
+    .chart-box { position: relative; height: 180px; margin-top: 8px; }
+    .bp-now { font-size: 1.6rem; font-weight: 800; color: var(--navy); }
+    .bp-now small { font-size: .78rem; color: var(--muted); font-weight: 600; margin-left: 4px; }
+
+    /* 검사 결과 */
+    .labs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+    .lab { background: var(--soft); border-radius: 14px; padding: 10px 12px; }
+    .lab b { display: block; font-size: 1.15rem; color: var(--navy); }
+    .lab span { font-size: .7rem; color: var(--muted); }
+    .fine { font-size: .74rem; color: var(--muted); margin: 10px 0 0; }
+
+    /* 알림 받기 */
+    .notify-ask { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .notify-ask p { margin: 0; font-size: .84rem; color: var(--ink); }
+    .notify-ask button { margin: 0; width: auto; border-radius: 999px; padding: 9px 16px; font-size: .84rem; font-weight: 700; white-space: nowrap; }
+    .notify-ask[hidden] { display: none; }
+
+    /* 알림함 */
+    .noti-list { list-style: none; padding: 0; margin: 0; }
+    .noti-list li { list-style: none; display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
+    .noti-list li:first-child { border-top: none; }
+    .noti-list li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex: none; background: var(--blue); }
+    .noti-list li.urgent::before { background: var(--warn); }
+    .noti-list li.warn::before { background: var(--amber); }
+    .noti-list li.ok::before { background: var(--ok); }
+    .noti-list b { display: block; font-size: .9rem; color: var(--navy); }
+    .noti-list span { font-size: .8rem; color: var(--muted); }
+    .noti-list .new { font-size: .62rem; font-weight: 800; color: var(--warn); margin-left: 6px; }
+
+    dialog article { max-width: 440px; width: calc(100vw - 32px); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+    #msg.ok { color: var(--ok); }
+    #msg.err { color: var(--warn); }
+    .demo { text-align: center; font-size: .72rem; color: var(--muted); margin-top: 6px; }
+    .demo select { width: auto; display: inline-block; padding: 2px 28px 2px 8px; height: auto; margin: 0 0 0 4px; font-size: .72rem; }
+  </style>
+</head>
+<body>
+<main>
+
+  <div class="top">
+    <div class="logo"><i></i>이음</div>
+    <button class="bell" id="bellBtn" aria-label="알림">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+      </svg>
+      <span class="badge" id="badge"></span>
+    </button>
+  </div>
+
+  <div class="hello">
+    <h1 id="hello">안녕하세요</h1>
+    <p id="helloSub"></p>
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+  <!-- 이번 주 기록 -->
+  <article class="week">
+    <div class="label">이번 주 기록</div>
+    <div class="week-row">
+      <div>
+        <h2 id="weekTitle">-</h2>
+        <p id="weekSub"></p>
+      </div>
+      <button id="openForm">기록하기</button>
+    </div>
+    <div class="dots" id="dots"></div>
+    <div class="dots-cap"><span>8주 전</span><span>이번 주</span></div>
+  </article>
+
+  <!-- 다음 추적검사 -->
+  <article>
+    <div class="label">다음 추적검사</div>
+    <div class="next-row">
+      <div>
+        <div class="dday" id="dday">-</div>
+        <div class="next-sub" id="nextSub"></div>
+      </div>
+    </div>
+    <div class="steps" id="steps"></div>
+  </article>
+
+  <!-- 혈압 -->
+  <article>
+    <div class="next-row">
+      <div>
+        <div class="label">내 혈압</div>
+        <div class="bp-now" id="bpNow">-</div>
+      </div>
+      <div class="next-sub" id="bpDate"></div>
+    </div>
+    <div class="chart-box"><canvas id="bpChart"></canvas></div>
+  </article>
+
+  <!-- 검사 결과 -->
+  <article>
+    <div class="next-row">
+      <div class="title">최근 검사 결과</div>
+      <div class="next-sub" id="labDate"></div>
+    </div>
+    <div class="labs">
+      <div class="lab"><span>eGFR</span><b id="labEgfr">-</b><span id="labPercent"></span></div>
+      <div class="lab"><span>크레아티닌</span><b id="labCr">-</b><span>mg/dL</span></div>
+      <div class="lab"><span>소변 단백</span><b id="labUp">-</b><span>&nbsp;</span></div>
+    </div>
+    <p class="fine">검사 결과는 병원 연구 담당자가 입력합니다. 수치에 대한 판단은 담당 의료진과 상담하세요.</p>
+  </article>
+
+  <!-- 알림 받기 -->
+  <article class="notify-ask" id="notifyAsk" hidden>
+    <p>검사 기간과 주간 기록을<br>알림으로 받아 보세요.</p>
+    <button id="notifyBtn">알림 받기</button>
+  </article>
+
+  <div class="demo">데모 공여자
+    <select id="donorCode"><option>D-001</option><option>D-002</option><option>D-003</option></select>
+  </div>
+</main>
+
+<!-- 기록 입력 창 -->
+<dialog id="formDialog">
+  <article>
+    <header>
+      <button aria-label="닫기" rel="prev" id="closeForm"></button>
+      <strong>혈압 · 체중 기록</strong>
+    </header>
+    <form id="form">
+      <label>측정 날짜 <input type="date" name="measured_at" required></label>
+      <div class="grid2">
+        <label>수축기 혈압 <input type="number" name="systolic_bp" min="50" max="260" placeholder="예: 120" inputmode="numeric" required></label>
+        <label>이완기 혈압 <input type="number" name="diastolic_bp" min="30" max="160" placeholder="예: 80" inputmode="numeric" required></label>
+      </div>
+      <label>체중 (kg) <input type="number" name="weight_kg" min="20" max="300" step="0.1" placeholder="예: 60.5" inputmode="decimal"></label>
+      <small>같은 날짜로 다시 저장하면 그날 기록이 새 값으로 바뀝니다.</small>
+      <button type="submit">저장</button>
+      <p id="msg"></p>
+    </form>
+  </article>
+</dialog>
+
+<!-- 알림함 -->
+<dialog id="notiDialog">
+  <article>
+    <header>
+      <button aria-label="닫기" rel="prev" id="closeNoti"></button>
+      <strong>알림</strong>
+    </header>
+    <ul class="noti-list" id="notiList"></ul>
+  </article>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const num = (v) => (v === "" || v === null ? null : Number(v));
+const DAY = 86400000;
+const dot = (d) => d.replaceAll("-", ".");
+const STATUS_LABEL = { done: "완료", missed: "놓침", window: "검사 기간", upcoming: "예정" };
+const CHECK_EVERY_MIN = 30;     // 화면이 열려 있는 동안 알림을 다시 확인하는 간격
+
+// 데모용: 주소 ?code=D-002 로 공여자를 고를 수 있음 (실제 서비스에서는 로그인으로 대체)
+const params = new URLSearchParams(location.search);
+if (params.get("code")) $("donorCode").value = params.get("code");
+const code = () => $("donorCode").value;
+
+// 오늘 날짜 (한국 시간 기준)
+const now = new Date();
+const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const dateInput = document.querySelector("[name=measured_at]");
+dateInput.value = today;
+dateInput.max = today;
+const daysUntil = (d) => Math.round((new Date(d) - new Date(today)) / DAY);
+const mondayOf = (d) => { const x = new Date(d); const w = (x.getUTCDay() + 6) % 7; return new Date(x.getTime() - w * DAY).toISOString().slice(0, 10); };
+
+// 브라우저 저장소 (막혀 있어도 화면은 동작하게)
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k) || "[]"); } catch { return []; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const seenKey = () => `ieum-seen-${code()}`;          // 알림함에서 본 알림
+const pushedKey = () => `ieum-pushed-${code()}`;      // 브라우저 알림으로 띄운 알림
+
+Chart.defaults.font.family = "Pretendard, sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = "#8792A6";
+let bpChart, notis = [];
+
+// 응답을 안전하게 읽기: 서버 오류(500 등)는 JSON이 아닐 수 있음
+async function readJson(res) {
+  const text = await res.text();
+  try { return JSON.parse(text); } catch { return { detail: `서버 오류 (${res.status}) · 데이터베이스 준비(SQL 실행)가 끝났는지 확인해 주세요` }; }
+}
+const errText = (d) => (typeof d.detail === "string" ? d.detail : (d.detail || []).map((x) => x.msg).join(", "));
+
+// ---------- 불러오기 ----------
+async function loadAll() {
+  try {
+    const c = encodeURIComponent(code());
+    const [sRes, hRes, lRes, nRes] = await Promise.all([
+      fetch(`/donors/${c}/summary`), fetch(`/donors/${c}/home`),
+      fetch(`/donors/${c}/labs`), fetch(`/donors/${c}/notifications`),
+    ]);
+    if (!sRes.ok) { $("hello").textContent = sRes.status === 404 ? "공여자 코드를 찾을 수 없습니다" : errText(await readJson(sRes)); return; }
+    if (!hRes.ok || !lRes.ok || !nRes.ok) { $("hello").textContent = errText(await readJson(!hRes.ok ? hRes : !lRes.ok ? lRes : nRes)); return; }
+    const s = await sRes.json(), home = await hRes.json(), labs = await lRes.json();
+    notis = await nRes.json();
+    renderHello(s);
+    renderWeek(home);
+    renderNext(s);
+    renderBp(home);
+    renderLabs(s, labs);
+    renderNotis();
+    pushBrowserNotis();
+  } catch {
+    $("hello").textContent = "서버에 연결할 수 없습니다";
+  }
+}
+
+function renderHello(s) {
+  $("hello").innerHTML = `${s.donor_code}님,<br>기증 후 <span>${s.days_since_donation}일째</span>예요`;
+  $("helloSub").textContent = `기증일 ${dot(s.donation_date)}`;
+}
+
+// ---------- 이번 주 기록 ----------
+function renderWeek(home) {
+  const thisMon = mondayOf(today);
+  const weeks = new Set(home.map((r) => mondayOf(r.measured_at)));
+  const doneThisWeek = weeks.has(thisMon);
+  $("weekTitle").textContent = doneThisWeek ? "기록 완료 ✓" : "아직 기록 전이에요";
+  const last = home[home.length - 1];
+  $("weekSub").textContent = last ? `마지막 기록 ${dot(last.measured_at)} · ${last.systolic_bp}/${last.diastolic_bp}` : "첫 기록을 남겨 주세요";
+  $("openForm").textContent = doneThisWeek ? "다시 기록" : "기록하기";
+  // 최근 8주 막대: 기록한 주는 흰색
+  let html = "";
+  for (let i = 7; i >= 0; i--) {
+    const mon = new Date(new Date(thisMon).getTime() - i * 7 * DAY).toISOString().slice(0, 10);
+    html += `<i class="${weeks.has(mon) ? "on" : ""}" title="${dot(mon)} 주"></i>`;
+  }
+  $("dots").innerHTML = html;
+}
+
+// ---------- 다음 검사 ----------
+function renderNext(s) {
+  const inWindow = s.visits.find((v) => v.status === "window");
+  const next = s.visits.find((v) => v.status === "upcoming");
+  const target = inWindow || next;
+  $("dday").textContent = target ? (inWindow ? "지금 검사 기간" : `D-${daysUntil(target.due_date)}`) : "-";
+  $("nextSub").textContent = target ? `${target.visit_name} · 예정일 ${dot(target.due_date)}` : "등록된 일정이 없어요";
+  $("steps").innerHTML = s.visits.map((v) =>
+    `<div class="step ${v.status}">${v.visit_name.replace("기증 후 ", "")}<br>${STATUS_LABEL[v.status]}</div>`).join("");
+
+  const missed = s.visits.find((v) => v.status === "missed");
+  const b = $("banner");
+  if (missed) {
+    b.className = "banner urgent";
+    b.innerHTML = `<div><b>${missed.visit_name} 검사를 아직 받지 않았어요</b><span>이식센터에 연락해 검사 일정을 잡아 주세요.</span></div>`;
+  } else if (inWindow) {
+    b.className = "banner warn";
+    b.innerHTML = `<div><b>지금은 ${inWindow.visit_name} 검사 기간이에요</b><span>기간 안에 검사를 받아 주세요.</span></div>`;
+  } else {
+    b.className = "banner"; b.innerHTML = "";
+  }
+}
+
+// ---------- 혈압 그래프 (최근 12주) ----------
+function renderBp(home) {
+  if (bpChart) bpChart.destroy();
+  const recent = home.filter((r) => daysUntil(r.measured_at) >= -84 && r.systolic_bp != null);
+  const last = recent[recent.length - 1];
+  $("bpNow").innerHTML = last ? `${last.systolic_bp}/${last.diastolic_bp}<small>mmHg</small>` : "-";
+  $("bpDate").textContent = last ? dot(last.measured_at) : "기록 없음";
+  const pt = (k) => recent.map((r) => ({ x: r.measured_at, y: r[k] }));
+  const style = (c) => ({ borderColor: c, backgroundColor: c, borderWidth: 2, tension: 0.4, pointRadius: 3,
+                          pointBackgroundColor: "#fff", pointBorderColor: c, pointBorderWidth: 2 });
+  bpChart = new Chart($("bpChart"), {
+    type: "line",
+    data: { datasets: [
+      { label: "수축기", data: pt("systolic_bp"), ...style("#3F6FE0") },
+      { label: "이완기", data: pt("diastolic_bp"), ...style("#9DB7F5") },
+    ]},
+    options: {
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: "time", grid: { display: false }, border: { display: false },
+             ticks: { maxTicksLimit: 4, maxRotation: 0 }, time: { unit: "week", displayFormats: { week: "MM.dd" }, tooltipFormat: "yyyy.MM.dd" } },
+        y: { min: 50, max: 180, grid: { color: "#EEF2F7" }, border: { display: false }, ticks: { maxTicksLimit: 4 } },
+      },
+      plugins: { legend: { align: "end", labels: { boxWidth: 7, boxHeight: 7, usePointStyle: true } } },
+    },
+  });
+}
+
+// ---------- 검사 결과 (읽기만) ----------
+function renderLabs(s, labs) {
+  const last = labs[labs.length - 1];
+  $("labDate").textContent = last ? `${dot(last.tested_at)}${last.visit_name ? " · " + last.visit_name : ""}` : "아직 없음";
+  $("labEgfr").textContent = last?.egfr ?? "-";
+  $("labPercent").textContent = s.egfr_percent_of_predonation != null ? `기증 전의 ${s.egfr_percent_of_predonation}%` : " ";
+  $("labCr").textContent = last?.creatinine ?? "-";
+  $("labUp").textContent = last?.urine_protein ?? "-";
+}
+
+// ---------- 알림함 ----------
+function renderNotis() {
+  const seen = new Set(store.get(seenKey()));
+  const unseen = notis.filter((n) => !seen.has(n.id)).length;
+  $("badge").textContent = unseen ? String(unseen) : "";
+  $("notiList").innerHTML = notis.length
+    ? notis.map((n) => `<li class="${n.level}"><div><b>${n.title}${seen.has(n.id) ? "" : '<span class="new">NEW</span>'}</b><span>${n.body}</span></div></li>`).join("")
+    : "<li><div><b>새 알림이 없어요</b><span>이번 주도 잘 기록하고 계세요.</span></div></li>";
+}
+$("bellBtn").addEventListener("click", () => {
+  $("notiDialog").showModal();
+  store.set(seenKey(), [...new Set([...store.get(seenKey()), ...notis.map((n) => n.id)])]);
+});
+$("closeNoti").addEventListener("click", () => { $("notiDialog").close(); renderNotis(); });
+
+// ---------- 브라우저 알림 ----------
+const canNotify = "Notification" in window;
+function updateNotifyAsk() {
+  $("notifyAsk").hidden = !canNotify || Notification.permission !== "default";
+}
+$("notifyBtn").addEventListener("click", async () => {
+  const p = await Notification.requestPermission();
+  updateNotifyAsk();
+  if (p === "granted") pushBrowserNotis();
+});
+function pushBrowserNotis() {
+  if (!canNotify || Notification.permission !== "granted") return;
+  const pushed = new Set(store.get(pushedKey()));
+  notis.filter((n) => !pushed.has(n.id)).forEach((n) => {
+    try { new Notification(`이음 · ${n.title}`, { body: n.body, tag: n.id }); } catch {}
+    pushed.add(n.id);
+  });
+  store.set(pushedKey(), [...pushed]);
+}
+
+// ---------- 기록 저장 ----------
+function showMsg(t, ok) { $("msg").textContent = t; $("msg").className = ok ? "ok" : "err"; }
+$("openForm").addEventListener("click", () => { showMsg("", true); $("formDialog").showModal(); });
+$("closeForm").addEventListener("click", () => $("formDialog").close());
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const body = {
+    donor_code: code(), measured_at: f.get("measured_at"),
+    systolic_bp: num(f.get("systolic_bp")), diastolic_bp: num(f.get("diastolic_bp")), weight_kg: num(f.get("weight_kg")),
+  };
+  try {
+    const res = await fetch("/home-measurements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (res.ok) { $("formDialog").close(); e.target.reset(); dateInput.value = today; loadAll(); }
+    else { showMsg("저장 실패: " + errText(await readJson(res)), false); }
+  } catch { showMsg("서버에 연결할 수 없습니다.", false); }
+});
+
+$("donorCode").addEventListener("change", loadAll);
+updateNotifyAsk();
+loadAll();
+setInterval(loadAll, CHECK_EVERY_MIN * 60 * 1000);
+</script>
+</body>
+</html>
