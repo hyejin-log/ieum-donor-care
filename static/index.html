@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>신장 공여자 건강 기록</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+    @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } }
+    #msg.ok { color: #2e7d32; }
+    #msg.err { color: #c62828; }
+  </style>
+</head>
+<body>
+<main class="container">
+  <h1>신장 공여자 건강 기록</h1>
+
+  <div class="grid2">
+    <label>공여자 코드
+      <input id="donorCode" value="D-001">
+    </label>
+    <label>&nbsp;
+      <button id="loadBtn" class="secondary">기록 불러오기</button>
+    </label>
+  </div>
+
+  <article>
+    <h2>측정값 입력</h2>
+    <form id="form">
+      <label>측정 날짜 <input type="date" name="measured_at" required></label>
+      <small>같은 날짜로 다시 저장하면 그날 기록이 새 값으로 바뀝니다.</small>
+      <div class="grid2">
+        <label>수축기 혈압 (mmHg) <input type="number" name="systolic_bp" min="50" max="260" value="120"></label>
+        <label>이완기 혈압 (mmHg) <input type="number" name="diastolic_bp" min="30" max="160" value="80"></label>
+        <label>체중 (kg) <input type="number" name="weight_kg" min="20" max="300" step="0.1" value="60"></label>
+        <label>크레아티닌 (mg/dL) <input type="number" name="creatinine" min="0.1" max="20" step="0.01" value="0.9"></label>
+        <label>eGFR <input type="number" name="egfr" min="0" max="200" value="90"></label>
+        <label>소변 단백
+          <select name="urine_protein">
+            <option>Negative</option><option>Trace</option>
+            <option>1+</option><option>2+</option><option>3+</option>
+          </select>
+        </label>
+      </div>
+      <button type="submit">저장</button>
+    </form>
+    <p id="msg"></p>
+  </article>
+
+  <article><h2>혈압 추이</h2><canvas id="bpChart"></canvas></article>
+  <article><h2>eGFR 추이</h2><canvas id="egfrChart"></canvas></article>
+  <article>
+    <h2>기록 표</h2>
+    <div class="overflow-auto"><table id="table"></table></div>
+  </article>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const num = (v) => (v === "" || v === null ? null : Number(v));
+let bpChart, egfrChart;
+
+// 오늘 날짜 (한국 시간 기준, YYYY-MM-DD)
+const now = new Date();
+const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+  .toISOString().slice(0, 10);
+const dateInput = document.querySelector("[name=measured_at]");
+dateInput.value = today;
+dateInput.max = today;              // 미래 날짜 선택 불가
+
+function showMsg(text, ok) {
+  $("msg").textContent = text;
+  $("msg").className = ok ? "ok" : "err";
+}
+
+// 날짜 간격이 실제 일수대로 그려지는 가로축
+const timeAxis = {
+  type: "time",
+  time: { unit: "day", tooltipFormat: "yyyy-MM-dd", displayFormats: { day: "MM-dd" } },
+};
+
+// 기록 불러오기
+async function load() {
+  const code = $("donorCode").value.trim();
+  try {
+    const res = await fetch(`/donors/${encodeURIComponent(code)}/measurements`);
+    render(res.ok ? await res.json() : []);
+  } catch {
+    showMsg("서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.", false);
+  }
+}
+
+// 그래프와 표 그리기
+function render(rows) {
+  const point = (key) => rows.map((r) => ({ x: r.measured_at, y: r[key] }));
+  if (bpChart) bpChart.destroy();
+  if (egfrChart) egfrChart.destroy();
+
+  bpChart = new Chart($("bpChart"), {
+    type: "line",
+    data: { datasets: [
+      { label: "수축기", data: point("systolic_bp") },
+      { label: "이완기", data: point("diastolic_bp") },
+    ]},
+    options: { scales: { x: timeAxis, y: { min: 40, max: 200 } } },
+  });
+  egfrChart = new Chart($("egfrChart"), {
+    type: "line",
+    data: { datasets: [{ label: "eGFR", data: point("egfr") }] },
+    options: { scales: { x: timeAxis, y: { min: 0, max: 120 } } },
+  });
+
+  if (rows.length === 0) {
+    $("table").innerHTML = "<tr><td>아직 기록이 없습니다.</td></tr>";
+    return;
+  }
+  const head = "<tr><th>날짜</th><th>혈압</th><th>체중</th><th>크레아티닌</th><th>eGFR</th><th>소변 단백</th></tr>";
+  const body = rows.map((r) =>
+    `<tr><td>${r.measured_at}</td><td>${r.systolic_bp ?? "-"}/${r.diastolic_bp ?? "-"}</td>` +
+    `<td>${r.weight_kg ?? "-"}</td><td>${r.creatinine ?? "-"}</td>` +
+    `<td>${r.egfr ?? "-"}</td><td>${r.urine_protein ?? "-"}</td></tr>`
+  ).join("");
+  $("table").innerHTML = head + body;
+}
+
+// 저장
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const body = {
+    donor_code: $("donorCode").value.trim(),
+    measured_at: f.get("measured_at"),
+    systolic_bp: num(f.get("systolic_bp")),
+    diastolic_bp: num(f.get("diastolic_bp")),
+    weight_kg: num(f.get("weight_kg")),
+    creatinine: num(f.get("creatinine")),
+    egfr: num(f.get("egfr")),
+    urine_protein: f.get("urine_protein"),
+  };
+  try {
+    const res = await fetch("/measurements", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showMsg(data.updated ? "기존 기록을 새 값으로 바꿨습니다." : "저장되었습니다.", true);
+      load();
+    } else {
+      const err = await res.json();
+      const detail = typeof err.detail === "string"
+        ? err.detail
+        : err.detail.map((d) => d.msg).join(", ");
+      showMsg("저장 실패: " + detail, false);
+    }
+  } catch {
+    showMsg("서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.", false);
+  }
+});
+
+$("loadBtn").addEventListener("click", load);
+load();
+</script>
+</body>
+</html>
