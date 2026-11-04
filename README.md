@@ -10,18 +10,40 @@
 
 ## 화면
 
+**공여자 화면** · 어르신도 알기 쉽게: 무슨 기록인지 한 줄 설명, 내 수치가 기준의 어디쯤인지, 누르기만 하면 답하는 질문 버튼
+
 <table>
   <tr>
-    <td align="center" width="28%"><b>공여자 앱</b></td>
-    <td align="center" width="72%"><b>안내 Agent</b> · 내 기록 확인 → 응급 안전 안내 → 일상 대화</td>
+    <td align="center" width="33%"><b>첫 화면</b><br><sub>오늘 기록 · 다음 검사 D-day</sub></td>
+    <td align="center" width="33%"><b>병원 검사 결과</b><br><sub>쉬운 이름 · 판정 · 크레아티닌 그래프</sub></td>
+    <td align="center" width="33%"><b>수치 설명</b><br><sub>기준표에서 내 위치 · 기증자용 설명</sub></td>
   </tr>
   <tr>
-    <td valign="top"><img src="docs/images/donor.png" alt="공여자 화면: 기증 후 일수, 이번 주 기록, 다음 추적검사, 혈압 그래프, 최근 검사 결과"></td>
-    <td valign="top"><img src="docs/images/agent-chat.png" alt="안내 Agent 대화: 다음 검사 일정 답변, 가슴 통증에 119 안내, 산책 이야기에 기록 권유"></td>
+    <td valign="top"><img src="docs/images/donor.png" alt="공여자 첫 화면: 오늘의 혈압·체중 기록, 최근 7일, 다음 추적검사 D-day"></td>
+    <td valign="top"><img src="docs/images/donor-labs.png" alt="병원 검사 결과: eGFR·크레아티닌·소변 단백 쉬운 이름과 판정, 크레아티닌 변화 그래프"></td>
+    <td valign="top"><img src="docs/images/donor-explain.png" alt="eGFR 설명 창: 기준표에서 내 수치 줄 강조, 기증자용 설명"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>검사 여정</b><br><sub>6개월 · 1년 · 2년 · 3년 · 매년</sub></td>
+    <td align="center"><b>물어보기</b><br><sub>큰 질문 버튼 · 말로 묻기(🎤)</sub></td>
+    <td align="center"><b>안내 Agent</b><br><sub>내 기록에서 바로 답</sub></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="docs/images/donor-journey.png" alt="기증 후 검사 여정: 단계별 의미와 검사 기간"></td>
+    <td valign="top"><img src="docs/images/donor-ask.png" alt="질문 카드: 누르기만 하면 답하는 큰 질문 버튼"></td>
+    <td valign="top"><img src="docs/images/agent-chat.png" alt="안내 Agent 대화: 요즘 내 혈압 괜찮아요 질문에 최근 혈압과 기준으로 답변"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>로그인 · 회원가입</b><br><sub>공여자 코드 + 출생 연도로 본인 확인</sub></td>
+    <td align="center" colspan="2"><b>안전 안내</b><br><sub>응급 증상은 AI 답변 대신 119 안내</sub></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="docs/images/login.png" alt="회원가입 화면: 공여자/의료진 선택, 공여자 코드와 출생 연도"></td>
+    <td valign="top" colspan="2"><img src="docs/images/agent-safety.png" alt="안내 Agent: 가슴 통증에 119 안내, 일상 대화"></td>
   </tr>
 </table>
 
-**의료진 화면** · 놓친 추적검사, 혈압 경고, 이탈 위험 예측, 최근 12주 자가 기록률을 한눈에 보고 연구 데이터를 엑셀로 내려받습니다.
+**의료진 화면** · 놓친 추적검사, 혈압 경고, 이탈 위험 예측, 최근 12주 자가 기록률을 한눈에 보고, EMR(FHIR)에서 검사 결과를 가져오며, 연구 데이터를 엑셀 · eCRF 형식으로 내려받습니다.
 
 <img src="docs/images/staff.png" alt="의료진 화면: 공여자별 상태, 다음 추적검사와 이탈 위험, 최근 eGFR, 12주 자가 기록 막대">
 

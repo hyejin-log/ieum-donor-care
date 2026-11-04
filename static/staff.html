@@ -273,7 +273,15 @@ $("labForm").addEventListener("submit", async (e) => {
       showMsg(data.completed_visit ? `저장했습니다 · ${data.completed_visit} 완료 처리` : "저장했습니다", true);
       e.target.querySelector("[name=egfr]").value = "";
       e.target.querySelector("[name=creatinine]").value = "";
-      $("emrBtn").addEventListener("click", async (e) => {
+      load();
+      setTimeout(() => $("labDialog").close(), 1200);
+    } else {
+      showMsg("저장 실패: " + errText(data), false);
+    }
+  } catch { showMsg("서버에 연결할 수 없습니다.", false); }
+});
+
+$("emrBtn").addEventListener("click", async (e) => {
   e.preventDefault();
   $("emrBtn").textContent = "EMR에서 가져오는 중…";
   try {
@@ -288,14 +296,6 @@ $("labForm").addEventListener("submit", async (e) => {
     load();
   } finally { $("emrBtn").textContent = "EMR에서 검사 결과 가져오기"; }
 });
-load();
-      setTimeout(() => $("labDialog").close(), 1200);
-    } else {
-      showMsg("저장 실패: " + errText(data), false);
-    }
-  } catch { showMsg("서버에 연결할 수 없습니다.", false); }
-});
-
 load();
 </script>
 </body>

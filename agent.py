@@ -505,6 +505,10 @@ def run_agent_stream(messages: list[dict], impl: dict):
 
 # ---------- 5) 데모 모드: API 키가 없을 때의 간단한 규칙 답변 ----------
 
+# 내 기록·검사에 관한 단어: 이런 말이 있으면 일반 대화로 넘기지 않는다
+RECORD_WORDS = ["혈압", "체중", "몸무게", "검사", "egfr", "크레아티닌", "단백", "수치", "결과", "예약", "병원"]
+
+
 def small_talk(question: str, safety: dict, impl: dict) -> dict | None:
     """
     딥러닝 분류가 '일반'(인사·감사·근황)으로 본 문장은 AI 없이 바로 답한다.
@@ -512,6 +516,10 @@ def small_talk(question: str, safety: dict, impl: dict) -> dict | None:
     """
     tri = safety.get("triage")
     if not tri or tri["label"] != "일반" or tri["probs"]["일반"] < 0.7:
+        return None
+    # "요즘 내 혈압 괜찮아요?"처럼 인사처럼 보여도 내 기록·안내문을 묻는 말이면 그쪽이 답한다
+    q_nospace = question.replace(" ", "").lower()
+    if guide_direct(question) or any(w in q_nospace for w in RECORD_WORDS):
         return None
     q = question.replace(" ", "")
     if any(w in q for w in ["고마", "감사"]):
@@ -562,6 +570,8 @@ def record_answer(question: str, impl: dict) -> dict | None:
             reply += " 최근 혈압이 높게 측정되고 있다는 알림이 있어요. 같은 시간에 다시 재 보고, 계속 높으면 이식센터에 알려 주세요."
         elif any("혈압" in n["title"] and "낮게" in n["title"] for n in impl["get_notifications"]()):
             reply += " 혈압이 낮게 측정되었어요. 어지럽거나 쓰러질 것 같으면 이식센터나 병원에 연락해 주세요."
+        elif last["systolic_bp"] < 135 and last["diastolic_bp"] < 85 and last["systolic_bp"] >= 90 and last["diastolic_bp"] >= 60:
+            reply += " 집에서 잰 혈압 기준(135/85 미만) 안이라 괜찮은 범위예요. 내일도 같은 시간에 재 주세요."
         else:
             reply += " 수치에 대한 판단은 담당 의료진에게 확인해 주세요."
         return {"reply": reply, "tools_used": ["get_home_records", "get_notifications"], "mode": "record"}
