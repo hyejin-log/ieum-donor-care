@@ -1,12 +1,14 @@
+import io
 import os
 from datetime import date, timedelta
 from typing import Literal
 
+import pandas as pd
 import psycopg
 from psycopg.rows import dict_row
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 load_dotenv()                                  # .env 파일 읽기
@@ -17,6 +19,8 @@ app = FastAPI(title="이음 - Donor Care API")
 GRACE_DAYS = 60
 # 다음 검사 알림을 보내기 시작하는 시점 (예정일 30일 전)
 REMIND_DAYS = 30
+# 자가 기록률을 계산하는 기간 (최근 12주)
+RECENT_WEEKS = 12
 
 
 def get_conn():
@@ -334,6 +338,7 @@ def staff_overview():
     this_week = week_start(today)
     rows = []
     with get_conn() as conn:
+        weekly = weekly_records(conn, today)                 # 공여자 × 최근 12주 기록 여부 (pandas)
         donors = conn.execute(
             "SELECT donor_id, donor_code, donation_date, predonation_egfr FROM donors ORDER BY donor_code"
         ).fetchall()
@@ -373,8 +378,155 @@ def staff_overview():
                 "egfr_percent_of_predonation": percent,
                 "last_home_date": last_home,
                 "weeks_since_home": weeks_since_home,
+                "weekly_records": [bool(x) for x in weekly.loc[d["donor_code"]]],
+                "record_rate_percent": round(weekly.loc[d["donor_code"]].mean() * 100),
             })
 
     order = {"missed": 0, "window": 1, "ok": 2}
     rows.sort(key=lambda r: (order[r["status"]], -(r["weeks_since_home"] or 0)))
     return rows
+
+
+# ---------- 연구 데이터 내보내기 (pandas) ----------
+
+STATUS_KO = {"done": "완료", "missed": "놓침", "window": "검사 기간", "upcoming": "예정"}
+
+
+def query_df(conn, sql: str, columns: list[str], params: tuple = ()) -> pd.DataFrame:
+    """SQL 결과를 DataFrame으로. 결과가 없어도 열 이름은 유지한다."""
+    return pd.DataFrame(conn.execute(sql, params).fetchall(), columns=columns)
+
+
+def weekly_records(conn, today: date, weeks: int = RECENT_WEEKS) -> pd.DataFrame:
+    """
+    공여자 × 최근 N주 표를 만든다. 그 주(월~일)에 자가 기록이 한 번이라도 있으면 True.
+    행: 공여자 코드, 열: 각 주의 월요일 (오래된 주 → 이번 주)
+    """
+    first_week = week_start(today) - timedelta(weeks=weeks - 1)
+    week_index = pd.date_range(first_week, periods=weeks, freq="7D")       # 월요일 N개
+    codes = query_df(conn, "SELECT donor_code FROM donors ORDER BY donor_code", ["donor_code"])["donor_code"]
+    home = query_df(conn,
+        "SELECT d.donor_code, h.measured_at FROM home_measurements h "
+        "JOIN donors d ON d.donor_id = h.donor_id WHERE h.measured_at >= %s",
+        ["donor_code", "measured_at"], (first_week,))
+
+    if home.empty:
+        return pd.DataFrame(False, index=codes, columns=week_index)
+
+    # 측정일 → 그 주의 월요일 ("W-SUN" = 일요일에 끝나는 주, start_time = 그 주 월요일)
+    home["week"] = pd.to_datetime(home["measured_at"]).dt.to_period("W-SUN").dt.start_time
+    counts = pd.crosstab(home["donor_code"], home["week"])                  # 공여자 × 주 기록 건수
+    return counts.reindex(index=codes, columns=week_index, fill_value=0) > 0
+
+
+def build_research_tables(conn, today: date) -> dict[str, pd.DataFrame]:
+    """공여자 요약 · 검사 결과 · 자가 기록 · 추적검사 표 4개를 만든다."""
+    donors = query_df(conn,
+        "SELECT donor_id, donor_code, birth_year, sex, donation_date, predonation_egfr "
+        "FROM donors ORDER BY donor_code",
+        ["donor_id", "donor_code", "birth_year", "sex", "donation_date", "predonation_egfr"])
+    labs = query_df(conn,
+        "SELECT d.donor_code, l.tested_at, l.creatinine, l.egfr, l.urine_protein, f.visit_name, l.entered_by "
+        "FROM lab_results l JOIN donors d ON d.donor_id = l.donor_id "
+        "LEFT JOIN followups f ON f.followup_id = l.followup_id "
+        "ORDER BY d.donor_code, l.tested_at",
+        ["donor_code", "tested_at", "creatinine", "egfr", "urine_protein", "visit_name", "entered_by"])
+    home = query_df(conn,
+        "SELECT d.donor_code, h.measured_at, h.systolic_bp, h.diastolic_bp, h.weight_kg "
+        "FROM home_measurements h JOIN donors d ON d.donor_id = h.donor_id "
+        "ORDER BY d.donor_code, h.measured_at",
+        ["donor_code", "measured_at", "systolic_bp", "diastolic_bp", "weight_kg"])
+    visits = query_df(conn,
+        "SELECT d.donor_code, f.visit_name, f.due_date, f.completed_date "
+        "FROM followups f JOIN donors d ON d.donor_id = f.donor_id "
+        "ORDER BY d.donor_code, f.due_date",
+        ["donor_code", "visit_name", "due_date", "completed_date"])
+
+    # 자료형 정리: DB의 NUMERIC은 Decimal로 오므로 숫자(float)로 바꾼다
+    labs["creatinine"] = pd.to_numeric(labs["creatinine"])
+    home["weight_kg"] = pd.to_numeric(home["weight_kg"])
+
+    # 추적검사 상태: 화면과 같은 규칙(visit_status)을 한 행씩 적용
+    visits["status"] = [visit_status(due, done if pd.notna(done) else None, today)
+                        for due, done in zip(visits["due_date"], visits["completed_date"])]
+    visit_counts = (visits.groupby("donor_code")["status"]
+                    .value_counts().unstack(fill_value=0)
+                    .reindex(columns=["done", "missed"], fill_value=0)
+                    .rename(columns={"done": "completed_visits", "missed": "missed_visits"}))
+
+    # 최근 eGFR: 검사일순으로 정렬된 표에서 공여자별 마지막 값
+    latest = (labs.dropna(subset=["egfr"]).groupby("donor_code")
+              .agg(latest_egfr=("egfr", "last"), latest_egfr_date=("tested_at", "last")))
+
+    # 최근 12주 기록률: weekly_records 표에서 공여자별로 True(기록한 주)의 개수
+    weekly = weekly_records(conn, today)
+    first_week = weekly.columns[0].date()
+    recent = home[home["measured_at"] >= first_week]
+    adherence = pd.DataFrame({
+        "weeks_recorded": weekly.sum(axis=1),
+        "mean_systolic_bp": recent.groupby("donor_code")["systolic_bp"].mean(),
+    }).rename_axis("donor_code").reset_index()
+
+    summary = (donors.drop(columns="donor_id")
+               .merge(latest, on="donor_code", how="left")
+               .merge(adherence, on="donor_code", how="left")
+               .merge(visit_counts, on="donor_code", how="left"))
+    summary["days_since_donation"] = [(today - d).days for d in summary["donation_date"]]
+    summary["egfr_percent"] = (summary["latest_egfr"] / summary["predonation_egfr"] * 100).round()
+    summary["weeks_recorded"] = summary["weeks_recorded"].fillna(0).astype(int)
+    summary["record_rate_percent"] = (summary["weeks_recorded"] / RECENT_WEEKS * 100).round()
+    summary["mean_systolic_bp"] = summary["mean_systolic_bp"].round(1)
+    for col in ["completed_visits", "missed_visits"]:
+        summary[col] = summary[col].fillna(0).astype(int)
+
+    summary = summary[["donor_code", "birth_year", "sex", "donation_date", "days_since_donation",
+                       "predonation_egfr", "latest_egfr", "latest_egfr_date", "egfr_percent",
+                       "weeks_recorded", "record_rate_percent", "mean_systolic_bp",
+                       "completed_visits", "missed_visits"]]
+
+    return {
+        "공여자 요약": summary.rename(columns={
+            "donor_code": "공여자", "birth_year": "출생연도", "sex": "성별", "donation_date": "기증일",
+            "days_since_donation": "기증 후 일수", "predonation_egfr": "기증 전 eGFR",
+            "latest_egfr": "최근 eGFR", "latest_egfr_date": "최근 eGFR 검사일", "egfr_percent": "기증 전 대비 %",
+            "weeks_recorded": f"최근 {RECENT_WEEKS}주 중 기록한 주", "record_rate_percent": "기록률 %",
+            "mean_systolic_bp": "평균 수축기 혈압", "completed_visits": "완료 추적검사",
+            "missed_visits": "놓친 추적검사"}),
+        "검사 결과": labs.rename(columns={
+            "donor_code": "공여자", "tested_at": "검사일", "creatinine": "크레아티닌", "egfr": "eGFR",
+            "urine_protein": "소변 단백", "visit_name": "추적검사", "entered_by": "입력자"}),
+        "자가 기록": home.rename(columns={
+            "donor_code": "공여자", "measured_at": "측정일", "systolic_bp": "수축기",
+            "diastolic_bp": "이완기", "weight_kg": "체중"}),
+        "주간 기록": weekly.rename(columns=lambda w: f"{w:%m.%d}주")
+                         .replace({True: "O", False: ""})
+                         .rename_axis("공여자").reset_index(),
+        "추적검사": visits.assign(status=visits["status"].map(STATUS_KO)).rename(columns={
+            "donor_code": "공여자", "visit_name": "추적검사", "due_date": "예정일",
+            "completed_date": "완료일", "status": "상태"}),
+    }
+
+
+@app.get("/export/research.xlsx")
+def export_research():
+    """연구 데이터를 엑셀 파일 하나(시트 4개)로 내려받는다. 의료진용."""
+    today = date.today()
+    with get_conn() as conn:
+        tables = build_research_tables(conn, today)
+
+    buffer = io.BytesIO()                                   # 파일 대신 메모리에 엑셀을 쓴다
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        for sheet, df in tables.items():
+            df.to_excel(writer, sheet_name=sheet, index=False)
+            ws = writer.sheets[sheet]
+            for i, col in enumerate(df.columns, start=1):   # 열 너비를 글자 수에 맞춤
+                width = max([len(str(col))] + [len(str(v)) for v in df[col]]) + 4
+                ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = min(width, 30)
+    buffer.seek(0)
+
+    filename = f"ieum_research_{today:%Y%m%d}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

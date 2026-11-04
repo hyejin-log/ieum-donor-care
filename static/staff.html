@@ -45,7 +45,7 @@
     .page-title h1 b { font-weight: 800; }
     .page-title p { margin: 0; color: var(--muted); font-size: .85rem; }
 
-    .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+    .tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
     .tile { background: var(--card); border-radius: 20px; box-shadow: var(--shadow); padding: 14px 18px; }
     .tile b { display: block; font-size: 1.9rem; font-weight: 800; color: var(--navy); line-height: 1.2; }
     .tile.warn b { color: var(--warn); }
@@ -77,6 +77,13 @@
     .note { font-size: .74rem; color: var(--muted); margin: 0 6px; }
 
     @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .weeks { display: flex; gap: 2px; margin-top: 6px; }
+    .weeks i { width: 7px; height: 12px; border-radius: 2px; background: var(--line); }
+    .weeks i.on { background: var(--ok); }
+    .weeks i.now { outline: 1.5px solid var(--navy); outline-offset: 1px; }
+    .rate { font-size: .72rem; font-weight: 700; color: var(--ink); margin-left: 6px; }
+    .rate.low { color: var(--warn); }
+    .top-links { display: flex; gap: 18px; align-items: center; }
   </style>
 </head>
 <body>
@@ -84,7 +91,10 @@
 
   <div class="topbar">
     <div class="logo"><i></i>이음 <small>의료진</small></div>
-    <a href="/" target="_blank">공여자 화면 보기 ↗</a>
+    <div class="top-links">
+      <a href="/export/research.xlsx" download title="공여자 요약 · 검사 결과 · 자가 기록 · 추적검사 (시트 4개)">연구 데이터 엑셀 ↓</a>
+      <a href="/" target="_blank">공여자 화면 보기 ↗</a>
+    </div>
   </div>
 
   <div class="page-title">
@@ -97,13 +107,14 @@
     <div class="tile warn"><b id="tMissed">-</b><span>추적검사 놓침</span></div>
     <div class="tile amber"><b id="tWindow">-</b><span>지금 검사 기간</span></div>
     <div class="tile"><b id="tGap">-</b><span>자가 기록 2주 이상 끊김</span></div>
+    <div class="tile"><b id="tRate">-</b><span>평균 자가 기록률 (최근 12주)</span></div>
   </section>
 
   <article>
     <div class="overflow-auto">
       <table>
         <thead><tr>
-          <th>공여자</th><th>상태</th><th>다음 추적검사</th><th>최근 eGFR</th><th>자가 기록</th><th></th>
+          <th>공여자</th><th>상태</th><th>다음 추적검사</th><th>최근 eGFR</th><th>자가 기록 · 최근 12주</th><th></th>
         </tr></thead>
         <tbody id="rows"><tr><td colspan="6">불러오는 중…</td></tr></tbody>
       </table>
@@ -172,6 +183,7 @@ async function load() {
     $("tMissed").textContent = rows.filter((r) => r.status === "missed").length;
     $("tWindow").textContent = rows.filter((r) => r.status === "window").length;
     $("tGap").textContent = rows.filter((r) => r.weeks_since_home == null || r.weeks_since_home >= 2).length;
+    $("tRate").textContent = rows.length ? Math.round(rows.reduce((a, r) => a + r.record_rate_percent, 0) / rows.length) + "%" : "-";
     $("rows").innerHTML = rows.map(row).join("") || '<tr><td colspan="6">등록된 공여자가 없습니다.</td></tr>';
     document.querySelectorAll("[data-lab]").forEach((b) => b.addEventListener("click", () => openLab(b.dataset.lab)));
   } catch {
@@ -191,12 +203,16 @@ function row(r) {
   const gap = w == null ? '<span class="pill gap bad">기록 없음</span>'
     : w === 0 ? '<span class="pill ok">이번 주 기록</span>'
     : `<span class="pill gap ${w >= 2 ? "bad" : ""}">${w}주 전</span>`;
+  // 최근 12주 기록 막대: 칸 하나 = 한 주, 초록 = 기록함, 맨 오른쪽 = 이번 주
+  const weeks = r.weekly_records.map((on, i, a) =>
+    `<i class="${on ? "on" : ""} ${i === a.length - 1 ? "now" : ""}"></i>`).join("");
+  const rate = `<span class="rate ${r.record_rate_percent < 70 ? "low" : ""}">${r.record_rate_percent}%</span>`;
   return `<tr>
     <td><span class="code">${r.donor_code}</span><div class="muted">기증 후 ${r.days_since_donation}일</div></td>
     <td><span class="pill ${r.status}">${STATUS[r.status]}</span>${statusDetail ? `<div class="muted">${statusDetail}</div>` : ""}</td>
     <td>${next}</td>
     <td>${egfr}</td>
-    <td>${gap}</td>
+    <td>${gap}${rate}<div class="weeks" title="최근 12주 기록 (오른쪽이 이번 주)">${weeks}</div></td>
     <td><div class="row-actions">
       <a href="/dashboard?code=${encodeURIComponent(r.donor_code)}">상세</a>
       <button data-lab="${r.donor_code}">검사 결과 입력</button>
