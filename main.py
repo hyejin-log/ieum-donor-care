@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from typing import Literal
 
 import pandas as pd
+import agent
 import psycopg
 from psycopg.rows import dict_row
 from dotenv import load_dotenv
@@ -433,6 +434,42 @@ def donor_notifications(donor_code: str):
                       "title": "새 검사 결과가 등록됐어요",
                       "body": f"{lab['tested_at'].isoformat()} 검사 결과를 확인해 보세요."})
     return items
+
+
+# ---------- 안내 Agent (LLM) ----------
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=1000)
+
+
+class ChatIn(BaseModel):
+    messages: list[ChatMessage] = Field(min_length=1, max_length=20)   # 최근 대화만 보낸다
+
+
+@app.post("/donors/{donor_code}/chat")
+def donor_chat(donor_code: str, chat: ChatIn):
+    """공여자 질문에 안내 Agent가 답한다. 도구는 이 공여자의 기록만 조회하도록 고정한다."""
+    with get_conn() as conn:
+        get_donor(conn, donor_code)                     # 없는 공여자면 404
+    if chat.messages[-1].role != "user":
+        raise HTTPException(status_code=422, detail="마지막 메시지는 질문이어야 합니다")
+
+    impl = {
+        "get_donation_summary": lambda: donor_summary(donor_code),
+        "get_home_records": lambda: list_home(donor_code)[-12:],
+        "get_lab_results": lambda: list_labs(donor_code),
+        "get_notifications": lambda: donor_notifications(donor_code),
+    }
+    result = agent.run_agent([m.model_dump() for m in chat.messages], impl)
+    result["disclaimer"] = agent.DISCLAIMER
+    return result
+
+
+@app.post("/agent/warmup")
+def agent_warmup():
+    """대화 창을 열 때 호출: 로컬 모델을 미리 불러 둔다."""
+    return {"ready": agent.warm_up()}
 
 
 # ---------- 의료진: 전체 공여자 현황 ----------

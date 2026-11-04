@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+psycopg[binary]
+python-dotenv
+pydantic
+pandas
+openpyxl
+# anthropic   # Claude API를 쓸 때만 설치
