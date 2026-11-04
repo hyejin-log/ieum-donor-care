@@ -104,21 +104,32 @@
     .notify-ask button { margin: 0; width: auto; border-radius: 999px; padding: 9px 16px; font-size: .84rem; font-weight: 700; white-space: nowrap; }
     .notify-ask[hidden] { display: none; }
     /* 안내 Agent */
-    .ask-card h3 { font-size: .95rem; margin: 0 0 4px; color: var(--navy); }
-    .ask-card p { font-size: .8rem; color: var(--muted); margin: 0 0 10px; }
+    .ask-card h3 { font-size: 1.15rem; margin: 0 0 4px; color: var(--navy); }
+    .ask-card p { font-size: .95rem; color: var(--ink); margin: 0 0 12px; }
+    .ask-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .ask-list button { margin: 0; width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; padding: 14px 16px;
+                       border-radius: 16px; border: 1px solid var(--line); background: var(--soft); color: var(--navy);
+                       font-size: 1.02rem; font-weight: 700; box-shadow: none; }
+    .ask-list button:hover { background: var(--blue-soft); border-color: var(--blue-soft); }
+    .ask-list .ic { font-size: 1.25rem; flex: none; }
+    .ask-list i { margin-left: auto; font-style: normal; color: var(--blue); font-size: 1.4rem; line-height: 1; }
+    .ask-card .ask-note { font-size: .85rem; color: var(--muted); margin: 8px 0 0; text-align: center; }
+    .chat-hint { font-size: .85rem; color: var(--muted); margin: 0 0 4px; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chips button { margin: 0; width: auto; padding: 7px 12px; font-size: .78rem; border-radius: 999px;
                     background: var(--blue-soft); color: var(--blue); border: none; font-weight: 600; }
     #chatDialog article { display: flex; flex-direction: column; height: min(78vh, 640px); padding-bottom: 12px; }
     .chat-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 2px 10px; }
-    .msg { max-width: 86%; padding: 9px 12px; border-radius: 16px; font-size: .86rem; line-height: 1.55; white-space: pre-wrap; }
+    .msg { max-width: 88%; padding: 11px 14px; border-radius: 16px; font-size: 1rem; line-height: 1.6; white-space: pre-wrap; }
     .msg.user { align-self: flex-end; background: var(--navy); color: #fff; border-bottom-right-radius: 4px; }
     .msg.bot { align-self: flex-start; background: var(--soft); color: var(--ink); border-bottom-left-radius: 4px; }
     .msg.bot.safety { background: var(--warn-soft); color: #A63E26; font-weight: 600; }
     .msg .meta { display: block; margin-top: 4px; font-size: .68rem; color: var(--muted); }
     .chat-form { display: flex; gap: 6px; margin: 0; }
-    .chat-form input { margin: 0; border-radius: 999px; font-size: .86rem; }
-    .chat-form button { margin: 0; width: auto; border-radius: 999px; padding: 0 16px; font-size: .84rem; }
+    .chat-form input { margin: 0; border-radius: 999px; font-size: 1rem; height: 52px; }
+    .chat-form button { margin: 0; width: auto; border-radius: 999px; padding: 0 18px; font-size: 1rem; font-weight: 700; white-space: nowrap; flex: none; }
+    .chat-form .mic { background: var(--blue-soft); color: var(--blue); border: none; font-size: 1.3rem; padding: 0 14px; }
+    .chat-form .mic.on { background: var(--warn); color: #fff; }
     .chat-note { font-size: .7rem; color: var(--muted); text-align: center; margin: 6px 0 0; }
 
     /* 알림함 */
@@ -139,6 +150,67 @@
     #msg.err { color: var(--warn); }
     .demo { text-align: center; font-size: .72rem; color: var(--muted); margin-top: 6px; }
     .demo select { width: auto; display: inline-block; padding: 2px 28px 2px 8px; height: auto; margin: 0 0 0 4px; font-size: .72rem; }
+
+    /* 쉬운 설명 · 상태 칩 */
+    .explain { font-size: .78rem; color: var(--muted); margin: 4px 0 0; line-height: 1.5; }
+    .week .explain { color: rgba(255, 255, 255, .8); }
+    .chip { display: inline-block; font-size: .7rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); }
+    .chip.ok { background: var(--ok-soft); color: var(--ok); }
+    .chip.warn { background: var(--amber-soft); color: var(--amber); }
+    .chip.urgent { background: var(--warn-soft); color: var(--warn); }
+    .link-btn { margin: 0; width: auto; background: none; border: none; padding: 0; color: var(--blue); font-size: .78rem; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+    [hidden] { display: none !important; }
+    .lab { cursor: pointer; border: 1px solid transparent; text-align: left; margin: 0; width: 100%; background: var(--soft); color: var(--ink); font-weight: 400; font-size: inherit; box-shadow: none; }
+    .lab:focus { box-shadow: none; }
+    .lab:hover { border-color: var(--blue-soft); }
+    .lab .chip { margin-top: 6px; }
+    .lab .plain { display: block; font-size: .68rem; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+    .seg { display: flex; gap: 4px; background: var(--soft); border-radius: 999px; padding: 3px; margin: 14px 0 4px; }
+    .seg button { flex: 1; margin: 0; padding: 6px 0; font-size: .78rem; border-radius: 999px; border: none; background: none; color: var(--muted); font-weight: 700; }
+    .seg button.on { background: var(--card); color: var(--navy); box-shadow: 0 1px 3px rgba(23, 35, 61, .1); }
+    .day-cap { display: flex; gap: 6px; margin-top: 6px; }
+    .day-cap span { flex: 1; text-align: center; font-size: .66rem; color: rgba(255, 255, 255, .75); }
+    .step { cursor: pointer; }
+    /* 기록 창 안내 · 결과 */
+    .howto { background: var(--soft); border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; font-size: .8rem; }
+    .howto summary { font-weight: 700; color: var(--navy); }
+    .howto ul { margin: 6px 0 0; padding-left: 18px; }
+    .howto li { margin: 2px 0; list-style: disc; }
+    .result { border-radius: 16px; padding: 14px; margin-top: 4px; }
+    .result b { display: block; font-size: 1rem; margin-bottom: 4px; }
+    .result.normal { background: var(--ok-soft); color: #1F6E55; }
+    .result.high, .result.low { background: var(--amber-soft); color: #8A5B0A; }
+    .result.crisis { background: var(--warn-soft); color: #A63E26; }
+    /* 설명 창 */
+    .ref { width: 100%; font-size: .8rem; margin: 8px 0; }
+    .ref td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+    .ref td:first-child { font-weight: 700; white-space: nowrap; width: 38%; }
+    .ref tr.me td { background: var(--blue-soft); }
+    .mine { background: var(--blue-soft); border-radius: 14px; padding: 10px 12px; font-size: .84rem; margin: 8px 0; }
+    .note { font-size: .82rem; line-height: 1.6; }
+    .journey { list-style: none; padding: 0; margin: 8px 0 0; }
+    .journey li { list-style: none; position: relative; padding: 0 0 14px 22px; border-left: 2px solid var(--line); margin-left: 6px; }
+    .journey li:last-child { border-left-color: transparent; }
+    .journey li::before { content: ""; position: absolute; left: -7px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); border: 2px solid var(--muted); }
+    .journey li.done::before { background: var(--ok); border-color: var(--ok); }
+    .journey li.missed::before { background: var(--warn); border-color: var(--warn); }
+    .journey li.window::before { background: var(--amber); border-color: var(--amber); }
+    .journey li.upcoming::before, .journey li.later::before { border-color: var(--blue); }
+    .journey b { display: block; color: var(--navy); font-size: .9rem; }
+    .journey .when { font-size: .74rem; color: var(--muted); }
+    .journey p { font-size: .8rem; margin: 4px 0 0; line-height: 1.55; }
+    h4.sub { font-size: .86rem; margin: 14px 0 4px; color: var(--navy); }
+    /* 채팅 바로가기 */
+    .chat-start { margin: 0; width: 100%; border-radius: 16px; font-weight: 800; font-size: 1.05rem; padding: 15px; }
+    .fab { position: fixed; right: max(16px, calc(50vw - 224px)); bottom: 20px; width: auto; margin: 0; border-radius: 999px; padding: 12px 18px;
+           box-shadow: 0 8px 24px rgba(23, 35, 61, .25); font-weight: 700; font-size: .88rem; z-index: 5; display: flex; align-items: center; gap: 6px; }
+    .fab svg { width: 18px; height: 18px; }
+    .fab.hide { opacity: 0; pointer-events: none; transform: translateY(12px); }
+    .fab { transition: opacity .2s, transform .2s; font-size: 1rem; padding: 14px 20px; }
+    main { padding-bottom: 84px; }
+    .chat-chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 8px; flex: none; }
+    .chat-chips button { flex: none; margin: 0; width: auto; padding: 9px 14px; font-size: .92rem; border-radius: 999px;
+                         background: var(--blue-soft); color: var(--blue); border: none; font-weight: 600; white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -146,12 +218,15 @@
 
   <div class="top">
     <div class="logo"><i></i>이음</div>
+    <div style="display:flex;gap:8px;align-items:center">
+    <button class="link-btn" id="logoutBtn" style="color:var(--muted)">로그아웃</button>
     <button class="bell" id="bellBtn" aria-label="알림">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
       </svg>
       <span class="badge" id="badge"></span>
     </button>
+    </div>
   </div>
 
   <div class="hello">
@@ -161,9 +236,9 @@
 
   <div class="banner" id="banner"></div>
 
-  <!-- 이번 주 기록 -->
+  <!-- 오늘 기록 -->
   <article class="week">
-    <div class="label">이번 주 기록</div>
+    <div class="label">오늘의 혈압 · 체중</div>
     <div class="week-row">
       <div>
         <h2 id="weekTitle">-</h2>
@@ -171,19 +246,24 @@
       </div>
       <button id="openForm">기록하기</button>
     </div>
+    <p class="explain">집에서 매일 아침 같은 시간에 잰 혈압과 체중을 적는 곳이에요. 의료진이 기증 후 건강 변화를 보는 데 씁니다.</p>
     <div class="dots" id="dots"></div>
-    <div class="dots-cap"><span>8주 전</span><span>이번 주</span></div>
+    <div class="day-cap" id="dayCap"></div>
   </article>
 
   <!-- 다음 추적검사 -->
   <article>
-    <div class="label">다음 추적검사</div>
+    <div class="next-row">
+      <div class="label">다음 추적검사</div>
+      <button class="link-btn" id="openJourney">검사 여정 자세히</button>
+    </div>
     <div class="next-row">
       <div>
         <div class="dday" id="dday">-</div>
         <div class="next-sub" id="nextSub"></div>
       </div>
     </div>
+    <p class="explain">기증 후 정해진 때마다 병원에서 피·소변 검사와 혈압·체중을 확인해요. 남은 신장이 잘 지내는지 보는 검사예요.</p>
     <div class="steps" id="steps"></div>
   </article>
 
@@ -191,38 +271,52 @@
   <article>
     <div class="next-row">
       <div>
-        <div class="label">내 혈압</div>
+        <div class="label">내 혈압 (최근 12주)</div>
         <div class="bp-now" id="bpNow">-</div>
+        <span class="chip" id="bpChip"></span>
       </div>
-      <div class="next-sub" id="bpDate"></div>
+      <div style="text-align:right">
+        <div class="next-sub" id="bpDate"></div>
+        <button class="link-btn" data-info="bp">기준 보기</button>
+      </div>
     </div>
+    <p class="explain">앞 숫자는 심장이 피를 내보낼 때(수축기), 뒤 숫자는 쉴 때(이완기)의 혈압이에요. 점선은 집에서 잰 혈압의 기준선(135/85)이에요.</p>
     <div class="chart-box"><canvas id="bpChart"></canvas></div>
   </article>
 
   <!-- 검사 결과 -->
   <article>
     <div class="next-row">
-      <div class="title">최근 검사 결과</div>
+      <div class="title">병원 검사 결과</div>
       <div class="next-sub" id="labDate"></div>
     </div>
+    <p class="explain">추적검사 때 병원에서 잰 콩팥 검사예요. 칸을 누르면 뜻과 기준을 볼 수 있어요.</p>
     <div class="labs">
-      <div class="lab"><span>eGFR</span><b id="labEgfr">-</b><span id="labPercent"></span></div>
-      <div class="lab"><span>크레아티닌</span><b id="labCr">-</b><span>mg/dL</span></div>
-      <div class="lab"><span>소변 단백</span><b id="labUp">-</b><span>&nbsp;</span></div>
+      <button class="lab" data-info="egfr"><span>eGFR</span><span class="plain">콩팥 기능 점수</span><b id="labEgfr">-</b><span id="labPercent"></span><span class="chip" id="chipEgfr"></span></button>
+      <button class="lab" data-info="creatinine"><span>크레아티닌</span><span class="plain">콩팥이 거르는 노폐물</span><b id="labCr">-</b><span>mg/dL</span><span class="chip" id="chipCr"></span></button>
+      <button class="lab" data-info="urine_protein"><span>소변 단백</span><span class="plain">소변에 새는 단백질</span><b id="labUp">-</b><span>&nbsp;</span><span class="chip" id="chipUp"></span></button>
     </div>
-    <p class="fine">검사 결과는 병원 연구 담당자가 입력합니다. 수치에 대한 판단은 담당 의료진과 상담하세요.</p>
+    <div class="seg" id="labSeg">
+      <button data-k="creatinine" class="on">크레아티닌 변화</button>
+      <button data-k="egfr">eGFR 변화</button>
+    </div>
+    <div class="chart-box"><canvas id="labChart"></canvas></div>
+    <p class="explain" id="labChartNote"></p>
+    <p class="fine">검사 결과는 병원 연구 담당자가 입력합니다. 기준값은 일반 성인 참고 범위이며, 수치에 대한 판단은 담당 의료진과 상담하세요.</p>
   </article>
 
   <!-- 안내 Agent -->
   <article class="ask-card">
-    <h3>이음 안내에게 물어보기</h3>
-    <p>내 기록과 일정, 기증 후 생활에 대해 답해 드려요.</p>
-    <div class="chips" id="askChips">
-      <button>다음 검사 언제예요?</button>
-      <button>최근 혈압 어때요?</button>
-      <button>혈압은 어떻게 재요?</button>
-      <button>진통제 먹어도 돼요?</button>
+    <h3>궁금한 것이 있으세요?</h3>
+    <p>아래 질문을 <b>누르기만 하면</b> 바로 답해 드려요.</p>
+    <div class="ask-list" id="askChips">
+      <button data-q="다음 검사는 언제예요?"><span class="ic">📅</span>다음 검사는 언제예요?<i>›</i></button>
+      <button data-q="요즘 내 혈압 괜찮아요?"><span class="ic">🩺</span>요즘 내 혈압 괜찮아요?<i>›</i></button>
+      <button data-q="혈압은 언제, 어떻게 재요?"><span class="ic">⏰</span>혈압은 언제, 어떻게 재요?<i>›</i></button>
+      <button data-q="진통제 먹어도 돼요?"><span class="ic">💊</span>진통제 먹어도 돼요?<i>›</i></button>
     </div>
+    <button class="chat-start" id="chatStart">✏️ 다른 것 직접 물어보기</button>
+    <p class="ask-note">글자로 적거나, 🎤 버튼을 눌러 말로 물어볼 수 있어요.</p>
   </article>
 
   <!-- 알림 받기 -->
@@ -231,29 +325,64 @@
     <button id="notifyBtn">알림 받기</button>
   </article>
 
-  <div class="demo">데모 공여자
+  <div class="demo" id="demoBox" hidden>의료진 보기 · 공여자
     <select id="donorCode"><option>D-001</option><option>D-002</option><option>D-003</option></select>
   </div>
 </main>
+
+<button class="fab" id="fab" aria-label="이음 안내와 채팅하기">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+  물어보기
+</button>
 
 <!-- 기록 입력 창 -->
 <dialog id="formDialog">
   <article>
     <header>
       <button aria-label="닫기" rel="prev" id="closeForm"></button>
-      <strong>혈압 · 체중 기록</strong>
+      <strong>오늘의 혈압 · 체중 기록</strong>
     </header>
+    <details class="howto" open>
+      <summary>언제, 어떻게 재나요?</summary>
+      <ul id="howtoList"></ul>
+    </details>
     <form id="form">
       <label>측정 날짜 <input type="date" name="measured_at" required></label>
       <div class="grid2">
-        <label>수축기 혈압 <input type="number" name="systolic_bp" min="50" max="260" placeholder="예: 120" inputmode="numeric" required></label>
-        <label>이완기 혈압 <input type="number" name="diastolic_bp" min="30" max="160" placeholder="예: 80" inputmode="numeric" required></label>
+        <label>앞 숫자 (수축기) <input type="number" name="systolic_bp" min="50" max="260" placeholder="예: 120" inputmode="numeric" required></label>
+        <label>뒤 숫자 (이완기) <input type="number" name="diastolic_bp" min="30" max="160" placeholder="예: 80" inputmode="numeric" required></label>
       </div>
       <label>체중 (kg) <input type="number" name="weight_kg" min="20" max="300" step="0.1" placeholder="예: 60.5" inputmode="decimal"></label>
-      <small>같은 날짜로 다시 저장하면 그날 기록이 새 값으로 바뀝니다.</small>
+      <small>혈압계 화면의 큰 숫자 두 개를 순서대로 적어 주세요. 같은 날짜로 다시 저장하면 그날 기록이 새 값으로 바뀝니다.</small>
       <button type="submit">저장</button>
       <p id="msg"></p>
     </form>
+    <div id="resultBox" hidden>
+      <div class="result" id="result"></div>
+      <button id="resultOk" style="margin-top:12px">확인</button>
+    </div>
+  </article>
+</dialog>
+
+<!-- 설명 창: 검사 수치 · 혈압 기준 -->
+<dialog id="infoDialog">
+  <article>
+    <header>
+      <button aria-label="닫기" rel="prev" id="closeInfo"></button>
+      <strong id="infoTitle"></strong>
+    </header>
+    <div id="infoBody"></div>
+  </article>
+</dialog>
+
+<!-- 검사 여정 창 -->
+<dialog id="journeyDialog">
+  <article>
+    <header>
+      <button aria-label="닫기" rel="prev" id="closeJourney"></button>
+      <strong>기증 후 검사 여정</strong>
+    </header>
+    <div id="journeyBody"></div>
   </article>
 </dialog>
 
@@ -262,11 +391,22 @@
   <article>
     <header>
       <button aria-label="닫기" rel="prev" id="closeChat"></button>
-      <strong>이음 안내</strong>
+      <strong>이음 안내에게 물어보기</strong>
     </header>
+    <p class="chat-hint">누르면 바로 물어봐요 →</p>
+    <div class="chat-chips" id="chatChips">
+      <button>다음 검사는 언제예요?</button>
+      <button>요즘 내 혈압 괜찮아요?</button>
+      <button>혈압은 언제, 어떻게 재요?</button>
+      <button>eGFR이 뭐예요?</button>
+      <button>크레아티닌이 뭐예요?</button>
+      <button>진통제 먹어도 돼요?</button>
+      <button>운동해도 돼요?</button>
+    </div>
     <div class="chat-log" id="chatLog"></div>
     <form class="chat-form" id="chatForm">
-      <input name="q" placeholder="궁금한 점을 입력하세요" maxlength="300" autocomplete="off" required>
+      <button type="button" class="mic" id="micBtn" aria-label="말로 물어보기" hidden>🎤</button>
+      <input name="q" placeholder="질문을 적어 주세요" maxlength="300" autocomplete="off" required>
       <button type="submit">보내기</button>
     </form>
     <p class="chat-note">참고용 안내이며 진료를 대신하지 않아요. 응급 상황에는 119에 연락하세요.</p>
@@ -285,6 +425,11 @@
 </dialog>
 
 <script>
+// 로그인: 세션이 끝나면(401) 로그인 화면으로
+const _fetch = window.fetch;
+window.fetch = async (...a) => { const r = await _fetch(...a); if (r.status === 401 && !String(a[0]).startsWith("/auth/")) location.href = "/login"; return r; };
+async function logout() { await _fetch("/auth/logout", { method: "POST" }); location.href = "/login"; }
+
 const $ = (id) => document.getElementById(id);
 const num = (v) => (v === "" || v === null ? null : Number(v));
 const DAY = 86400000;
@@ -317,7 +462,10 @@ const pushedKey = () => `ieum-pushed-${code()}`;      // 브라우저 알림으�
 Chart.defaults.font.family = "Pretendard, sans-serif";
 Chart.defaults.font.size = 11;
 Chart.defaults.color = "#8792A6";
-let bpChart, notis = [];
+let displayName = null;            // 로그인한 공여자 이름 (인사말에 씀)
+let bpChart, labChart, notis = [], REF = null, summary = null, labsData = [], labKey = "creatinine";
+const UP_KO = { Negative: "음성", Trace: "미량", "1+": "1+", "2+": "2+", "3+": "3+" };
+const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 
 // 응답을 안전하게 읽기: 서버 오류(500 등)는 JSON이 아닐 수 있음
 async function readJson(res) {
@@ -338,11 +486,14 @@ async function loadAll() {
     if (!hRes.ok || !lRes.ok || !nRes.ok) { $("hello").textContent = errText(await readJson(!hRes.ok ? hRes : !lRes.ok ? lRes : nRes)); return; }
     const s = await sRes.json(), home = await hRes.json(), labs = await lRes.json();
     notis = await nRes.json();
+    if (!REF) { try { REF = await (await fetch("/guide/reference")).json(); renderHowto(); } catch {} }
+    summary = s; labsData = labs;
     renderHello(s);
     renderWeek(home);
     renderNext(s);
     renderBp(home);
     renderLabs(s, labs);
+    renderLabChart();
     renderNotis();
     pushBrowserNotis();
   } catch {
@@ -351,26 +502,29 @@ async function loadAll() {
 }
 
 function renderHello(s) {
-  $("hello").innerHTML = `${s.donor_code}님,<br>기증 후 <span>${s.days_since_donation}일째</span>예요`;
+  $("hello").innerHTML = `${displayName || s.donor_code}님,<br>기증 후 <span>${s.days_since_donation}일째</span>예요`;
   $("helloSub").textContent = `기증일 ${dot(s.donation_date)}`;
 }
 
-// ---------- 이번 주 기록 ----------
+// ---------- 오늘 기록 (하루 1번) ----------
 function renderWeek(home) {
-  const thisMon = mondayOf(today);
-  const weeks = new Set(home.map((r) => mondayOf(r.measured_at)));
-  const doneThisWeek = weeks.has(thisMon);
-  $("weekTitle").textContent = doneThisWeek ? "기록 완료 ✓" : "아직 기록 전이에요";
+  const days = new Set(home.map((r) => r.measured_at));
+  const doneToday = days.has(today);
+  $("weekTitle").textContent = doneToday ? "오늘 기록 완료 ✓" : "아직 오늘 기록 전이에요";
   const last = home[home.length - 1];
-  $("weekSub").textContent = last ? `마지막 기록 ${dot(last.measured_at)} · ${last.systolic_bp}/${last.diastolic_bp}` : "첫 기록을 남겨 주세요";
-  $("openForm").textContent = doneThisWeek ? "다시 기록" : "기록하기";
-  // 최근 8주 막대: 기록한 주는 흰색
-  let html = "";
-  for (let i = 7; i >= 0; i--) {
-    const mon = new Date(new Date(thisMon).getTime() - i * 7 * DAY).toISOString().slice(0, 10);
-    html += `<i class="${weeks.has(mon) ? "on" : ""}" title="${dot(mon)} 주"></i>`;
+  $("weekSub").textContent = last
+    ? `마지막 기록 ${dot(last.measured_at)} · 혈압 ${last.systolic_bp}/${last.diastolic_bp}${last.weight_kg != null ? ` · 체중 ${last.weight_kg}kg` : ""}`
+    : "첫 기록을 남겨 주세요";
+  $("openForm").textContent = doneToday ? "다시 기록" : "기록하기";
+  // 최근 7일 막대: 기록한 날은 흰색
+  let html = "", cap = "";
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(new Date(today).getTime() - i * DAY).toISOString().slice(0, 10);
+    html += `<i class="${days.has(d) ? "on" : ""}" title="${dot(d)}"></i>`;
+    cap += `<span>${i === 0 ? "오늘" : DOW[new Date(d).getUTCDay()]}</span>`;
   }
   $("dots").innerHTML = html;
+  $("dayCap").innerHTML = cap;
 }
 
 // ---------- 다음 검사 ----------
@@ -381,7 +535,7 @@ function renderNext(s) {
   $("dday").textContent = target ? (inWindow ? "지금 검사 기간" : `D-${daysUntil(target.due_date)}`) : "-";
   $("nextSub").textContent = target ? `${target.visit_name} · 예정일 ${dot(target.due_date)}` : "등록된 일정이 없어요";
   $("steps").innerHTML = s.visits.map((v) =>
-    `<div class="step ${v.status}">${v.visit_name.replace("기증 후 ", "")}<br>${STATUS_LABEL[v.status]}</div>`).join("");
+    `<div class="step ${v.status}" title="눌러서 자세히 보기">${v.visit_name.replace("기증 후 ", "")}<br>${STATUS_LABEL[v.status]}</div>`).join("");
 
   const missed = s.visits.find((v) => v.status === "missed");
   const b = $("banner");
@@ -397,12 +551,17 @@ function renderNext(s) {
 }
 
 // ---------- 혈압 그래프 (최근 12주) ----------
+let lastHome = null;
 function renderBp(home) {
+  lastHome = [...home].reverse().find((r) => r.systolic_bp != null) || null;
   if (bpChart) bpChart.destroy();
   const recent = home.filter((r) => daysUntil(r.measured_at) >= -84 && r.systolic_bp != null);
   const last = recent[recent.length - 1];
   $("bpNow").innerHTML = last ? `${last.systolic_bp}/${last.diastolic_bp}<small>mmHg</small>` : "-";
   $("bpDate").textContent = last ? dot(last.measured_at) : "기록 없음";
+  const lv = last ? bpLevel(last.systolic_bp, last.diastolic_bp) : null;
+  $("bpChip").className = `chip ${lv ? lv.cls : ""}`;
+  $("bpChip").textContent = lv ? lv.text : "";
   const pt = (k) => recent.map((r) => ({ x: r.measured_at, y: r[k] }));
   const style = (c) => ({ borderColor: c, backgroundColor: c, borderWidth: 2, tension: 0.4, pointRadius: 3,
                           pointBackgroundColor: "#fff", pointBorderColor: c, pointBorderWidth: 2 });
@@ -411,6 +570,7 @@ function renderBp(home) {
     data: { datasets: [
       { label: "수축기", data: pt("systolic_bp"), ...style("#3F6FE0") },
       { label: "이완기", data: pt("diastolic_bp"), ...style("#9DB7F5") },
+      refLine(recent, 135, "#E06A4F"), refLine(recent, 85, "#E8A99A"),
     ]},
     options: {
       maintainAspectRatio: false,
@@ -419,19 +579,182 @@ function renderBp(home) {
              ticks: { maxTicksLimit: 4, maxRotation: 0 }, time: { unit: "week", displayFormats: { week: "MM.dd" }, tooltipFormat: "yyyy.MM.dd" } },
         y: { min: 50, max: 180, grid: { color: "#EEF2F7" }, border: { display: false }, ticks: { maxTicksLimit: 4 } },
       },
-      plugins: { legend: { align: "end", labels: { boxWidth: 7, boxHeight: 7, usePointStyle: true } } },
+      plugins: { legend: { align: "end", labels: { boxWidth: 7, boxHeight: 7, usePointStyle: true, filter: (i) => !i.text.startsWith("기준") } } },
     },
   });
 }
 
+// 그래프 위 기준선(점선): 처음과 마지막 날짜를 잇는 수평선
+function refLine(rows, y, color, label = `기준 ${y}`) {
+  const xs = rows.map((r) => r.measured_at ?? r.tested_at);
+  return { label, data: xs.length ? [{ x: xs[0], y }, { x: xs[xs.length - 1], y }] : [],
+           borderColor: color, borderDash: [5, 4], borderWidth: 1.2, pointRadius: 0, fill: false, tension: 0 };
+}
+
+// 화면용 판정 (서버 bp_assess와 같은 기준)
+function bpLevel(sys, dia) {
+  const t = REF?.thresholds || { bp_home: [135, 85], bp_crisis: [180, 110], bp_low: [90, 60] };
+  if (sys >= t.bp_crisis[0] || dia >= t.bp_crisis[1]) return { cls: "urgent", text: "매우 높음" };
+  if (sys >= t.bp_home[0] || dia >= t.bp_home[1]) return { cls: "warn", text: "기준보다 높음" };
+  if (sys < t.bp_low[0] || dia < t.bp_low[1]) return { cls: "warn", text: "낮음" };
+  return { cls: "ok", text: "정상 범위" };
+}
+function egfrLevel(v) {
+  if (v == null) return null;
+  if (v >= 90) return { cls: "ok", text: "정상", row: 0 };
+  if (v >= 60) return { cls: "ok", text: "기증 후 흔함", row: 1 };
+  if (v >= 45) return { cls: "warn", text: "확인 필요", row: 2 };
+  if (v >= 30) return { cls: "urgent", text: "상담 필요", row: 3 };
+  return { cls: "urgent", text: "상담 필요", row: 4 };
+}
+function crLevel(v, sex) {
+  if (v == null) return null;
+  const hi = sex === "F" ? 1.1 : 1.3, lo = sex === "F" ? 0.5 : 0.7;
+  if (v > hi) return { cls: "warn", text: "범위보다 높음", row: sex === "F" ? 1 : 0 };
+  if (v < lo) return { cls: "ok", text: "범위보다 낮음", row: sex === "F" ? 1 : 0 };
+  return { cls: "ok", text: "범위 안", row: sex === "F" ? 1 : 0 };
+}
+function upLevel(v) {
+  if (v == null) return null;
+  if (v === "Negative") return { cls: "ok", text: "정상", row: 0 };
+  if (v === "Trace") return { cls: "warn", text: "다시 확인", row: 1 };
+  if (v === "1+") return { cls: "warn", text: "양성", row: 2 };
+  return { cls: "urgent", text: "양성 · 확인", row: 3 };
+}
+
 // ---------- 검사 결과 (읽기만) ----------
+const setChip = (id, lv) => { $(id).className = `chip ${lv ? lv.cls : ""}`; $(id).textContent = lv ? lv.text : ""; };
 function renderLabs(s, labs) {
   const last = labs[labs.length - 1];
   $("labDate").textContent = last ? `${dot(last.tested_at)}${last.visit_name ? " · " + last.visit_name : ""}` : "아직 없음";
   $("labEgfr").textContent = last?.egfr ?? "-";
   $("labPercent").textContent = s.egfr_percent_of_predonation != null ? `기증 전의 ${s.egfr_percent_of_predonation}%` : " ";
   $("labCr").textContent = last?.creatinine ?? "-";
-  $("labUp").textContent = last?.urine_protein ?? "-";
+  $("labUp").textContent = last?.urine_protein ? UP_KO[last.urine_protein] : "-";
+  setChip("chipEgfr", egfrLevel(last?.egfr));
+  setChip("chipCr", crLevel(last?.creatinine, s.sex));
+  setChip("chipUp", upLevel(last?.urine_protein));
+}
+
+// ---------- 검사 결과 그래프: 크레아티닌 / eGFR ----------
+function renderLabChart() {
+  if (labChart) labChart.destroy();
+  const k = labKey;
+  const rows = labsData.filter((r) => r[k] != null);
+  const female = summary?.sex === "F";
+  const lines = k === "creatinine"
+    ? [refLine(rows, female ? 1.1 : 1.3, "#E06A4F", "기준 위")]
+    : [refLine(rows, 60, "#C98A1B", "기준 60"), refLine(rows, 45, "#E06A4F", "기준 45")];
+  labChart = new Chart($("labChart"), {
+    type: "line",
+    data: { datasets: [
+      { label: k === "creatinine" ? "크레아티닌 (mg/dL)" : "eGFR", data: rows.map((r) => ({ x: r.tested_at, y: Number(r[k]) })),
+        borderColor: "#3F6FE0", backgroundColor: "#3F6FE0", borderWidth: 2, tension: 0.3, pointRadius: 4,
+        pointBackgroundColor: "#fff", pointBorderColor: "#3F6FE0", pointBorderWidth: 2 },
+      ...lines,
+    ]},
+    options: {
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: "time", grid: { display: false }, border: { display: false },
+             ticks: { maxTicksLimit: 4, maxRotation: 0 }, time: { unit: "month", displayFormats: { month: "yy.MM" }, tooltipFormat: "yyyy.MM.dd" } },
+        y: k === "creatinine" ? { min: 0, suggestedMax: 1.8, grid: { color: "#EEF2F7" }, border: { display: false } }
+                              : { min: 0, suggestedMax: 120, grid: { color: "#EEF2F7" }, border: { display: false } },
+      },
+      plugins: { legend: { align: "end", labels: { boxWidth: 7, boxHeight: 7, usePointStyle: true, filter: (i) => !i.text.startsWith("기준") } } },
+    },
+  });
+  $("labChartNote").textContent = !rows.length ? "아직 검사 결과가 없어요."
+    : k === "creatinine"
+      ? `점선은 ${female ? "성인 여성" : "성인 남성"} 참고 범위의 위쪽 끝(${female ? "1.1" : "1.3"})이에요. 크레아티닌은 콩팥 기능이 떨어지면 올라가요.`
+      : "주황 점선 60, 빨간 점선 45예요. 기증 후에는 60대가 흔하고, 시간이 지나도 유지되는지가 중요해요.";
+}
+$("labSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  labKey = b.dataset.k;
+  [...$("labSeg").children].forEach((x) => x.classList.toggle("on", x === b));
+  renderLabChart();
+});
+
+// ---------- 설명 창 ----------
+function openInfo(key) {
+  if (!REF) return;
+  const r = REF[key], last = labsData[labsData.length - 1];
+  let mine = "", lv = null;
+  if (key === "egfr" && last?.egfr != null) {
+    lv = egfrLevel(last.egfr);
+    mine = `내 최근 eGFR은 <b>${last.egfr}</b>${summary?.egfr_percent_of_predonation != null ? ` (기증 전 ${summary.predonation_egfr}의 ${summary.egfr_percent_of_predonation}%)` : ""}예요. → ${lv.text}`;
+  } else if (key === "creatinine" && last?.creatinine != null) {
+    lv = crLevel(Number(last.creatinine), summary?.sex);
+    mine = `내 최근 크레아티닌은 <b>${last.creatinine} mg/dL</b>예요. → ${lv.text}`;
+  } else if (key === "urine_protein" && last?.urine_protein) {
+    lv = upLevel(last.urine_protein);
+    mine = `내 최근 소변 단백은 <b>${UP_KO[last.urine_protein]}</b>이에요. → ${lv.text}`;
+  } else if (key === "bp") {
+    const h = lastHome;
+    if (h) { lv = bpLevel(h.systolic_bp, h.diastolic_bp);
+      lv.row = { "정상 범위": 0, "기준보다 높음": 1, "매우 높음": 2, "낮음": 3 }[lv.text];
+      mine = `내 최근 혈압은 <b>${h.systolic_bp}/${h.diastolic_bp} mmHg</b>예요. → ${lv.text}`; }
+  }
+  $("infoTitle").textContent = `${r.name} · ${r.plain}`;
+  $("infoBody").innerHTML = `
+    <p class="note">${r.what}</p>
+    ${mine ? `<div class="mine">${mine}</div>` : ""}
+    <h4 class="sub">기준${r.unit ? ` (${r.unit})` : ""}</h4>
+    <table class="ref">${r.ranges.map((x, i) => `<tr class="${lv && lv.row === i ? "me" : ""}"><td>${x[0]}</td><td>${x[1]}</td></tr>`).join("")}</table>
+    <h4 class="sub">기증하신 분께</h4>
+    <p class="note">${r.donor}</p>
+    <p class="fine">일반 성인 참고 범위예요. 병원·검사 방법에 따라 조금 다를 수 있으니, 내 수치의 의미는 담당 의료진과 상담하세요.</p>`;
+  $("infoDialog").showModal();
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-info]"); if (b) openInfo(b.dataset.info); });
+$("closeInfo").addEventListener("click", () => $("infoDialog").close());
+
+// ---------- 검사 여정 창 ----------
+const VISIT_TEXT = {
+  "기증 후 6개월": "남은 신장이 늘어난 일에 적응하는 시기예요. 혈압·체중과 피(크레아티닌·eGFR), 소변(단백) 검사로 회복이 잘 되고 있는지 처음 확인해요.",
+  "기증 후 1년": "회복 정도를 판단하는 기준이 되는 검사예요. 보통 이 무렵 eGFR이 기증 전의 60~70% 근처에서 자리를 잡아요.",
+  "기증 후 2년": "1년 때 값이 잘 유지되는지 봐요. 혈압이 오르거나 소변 단백이 새로 나오지 않는지가 중요해요.",
+  "기증 후 3년": "장기적으로 안정적인지 확인해요. 이후에도 같은 검사를 1년에 한 번 이어 가요.",
+};
+function openJourney() {
+  if (!summary) return;
+  const s = summary, g = REF?.thresholds?.grace_days ?? 60;
+  const add = (d, n) => new Date(new Date(d).getTime() + n * DAY).toISOString().slice(0, 10);
+  const items = s.visits.map((v) => `
+    <li class="${v.status}"><b>${v.visit_name} <span class="chip ${v.status === "done" ? "ok" : v.status === "missed" ? "urgent" : v.status === "window" ? "warn" : ""}">${STATUS_LABEL[v.status]}</span></b>
+      <span class="when">예정일 ${dot(v.due_date)} · 검사 기간 ${dot(add(v.due_date, -g))} ~ ${dot(add(v.due_date, g))}${v.completed_date ? ` · ${dot(v.completed_date)} 완료` : ""}</span>
+      <p>${VISIT_TEXT[v.visit_name] || "정기 추적검사예요."}</p></li>`).join("");
+  $("journeyBody").innerHTML = `
+    <p class="note">${dot(s.donation_date)}에 기증하신 뒤 <b>${s.days_since_donation}일</b>이 지났어요. 아래 순서로 검사를 받아요.</p>
+    <ul class="journey">
+      <li class="done"><b>기증 수술</b><span class="when">${dot(s.donation_date)}</span>
+        <p>신장 하나를 기증했어요. 남은 신장이 점점 더 많은 일을 맡으며 적응해요.</p></li>
+      ${items}
+      <li class="later"><b>그 뒤로 매년</b><span class="when">평생</span>
+        <p>1년에 한 번 혈압, 체중, 콩팥 기능(크레아티닌·eGFR), 소변 단백을 확인하는 것이 권장돼요.</p></li>
+    </ul>
+    <h4 class="sub">왜 추적검사를 받나요?</h4>
+    <p class="note">신장이 하나가 되면 대부분은 건강하게 지내지만, 시간이 지나며 혈압이 오르거나 콩팥 기능이 떨어지는 경우가 드물게 있어요. 정기 검사로 이런 변화를 일찍 찾으면 빨리 관리할 수 있어요. 이식센터는 이 결과를 모아 기증자의 장기 안전을 확인하는 데도 써요.</p>
+    <h4 class="sub">검사에서 하는 것</h4>
+    <table class="ref">
+      <tr><td>혈압 · 체중</td><td>기증 후 가장 중요한 생활 관리 지표</td></tr>
+      <tr><td>피 검사</td><td>크레아티닌을 재고, 그 값으로 eGFR(콩팥 기능 점수)을 계산</td></tr>
+      <tr><td>소변 검사</td><td>소변에 단백질이 새는지 확인</td></tr>
+    </table>
+    <h4 class="sub">검사 기간이란?</h4>
+    <p class="note">예정일 딱 그날이 아니어도 괜찮아요. 예정일 앞뒤 ${g}일 안에 받으면 제때 받은 것으로 봐요. 기간이 지나면 '놓침'으로 표시되니 이식센터에 연락해 다시 잡아 주세요.</p>
+    <p class="fine">일정과 검사 항목은 병원마다 다를 수 있어요. 정확한 일정은 이식센터 안내를 따르세요.</p>`;
+  $("journeyDialog").showModal();
+}
+$("openJourney").addEventListener("click", openJourney);
+$("steps").addEventListener("click", openJourney);
+$("closeJourney").addEventListener("click", () => $("journeyDialog").close());
+
+// ---------- 측정 안내 ----------
+function renderHowto() {
+  if (!REF) return;
+  $("howtoList").innerHTML = [...REF.measure.when, ...REF.measure.how].map((t) => `<li>${t}</li>`).join("");
 }
 
 // ---------- 알림함 ----------
@@ -471,7 +794,10 @@ function pushBrowserNotis() {
 
 // ---------- 기록 저장 ----------
 function showMsg(t, ok) { $("msg").textContent = t; $("msg").className = ok ? "ok" : "err"; }
-$("openForm").addEventListener("click", () => { showMsg("", true); $("formDialog").showModal(); });
+$("openForm").addEventListener("click", () => {
+  showMsg("", true); $("form").hidden = false; $("resultBox").hidden = true; $("formDialog").showModal();
+});
+$("resultOk").addEventListener("click", () => $("formDialog").close());
 $("closeForm").addEventListener("click", () => $("formDialog").close());
 $("form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -482,7 +808,15 @@ $("form").addEventListener("submit", async (e) => {
   };
   try {
     const res = await fetch("/home-measurements", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (res.ok) { $("formDialog").close(); e.target.reset(); dateInput.value = today; loadAll(); }
+    if (res.ok) {
+      const d = await res.json();
+      e.target.reset(); dateInput.value = today; loadAll();
+      // 저장 직후 혈압 판정을 바로 보여 준다
+      const b = d.bp || { level: "normal", title: "저장했어요", advice: "" };
+      $("result").className = `result ${b.level}`;
+      $("result").innerHTML = `<b>${body.systolic_bp}/${body.diastolic_bp} mmHg · ${b.title}</b>${b.advice}`;
+      $("form").hidden = true; $("resultBox").hidden = false;
+    }
     else { showMsg("저장 실패: " + errText(await readJson(res)), false); }
   } catch { showMsg("서버에 연결할 수 없습니다.", false); }
 });
@@ -506,7 +840,7 @@ function addMsg(role, text, mode) {
 async function ask(question) {
   if (!$("chatDialog").open) openChat();
   if (!chat.length && !$("chatLog").children.length)
-    addMsg("bot", `안녕하세요, ${code()}님. 기록과 일정, 기증 후 생활에 대해 물어보세요.`);
+    addMsg("bot", `안녕하세요, ${displayName || code()}님. 기록과 일정, 기증 후 생활에 대해 물어보세요.`);
   addMsg("user", question);
   chat.push({ role: "user", content: question });
   const box = addMsg("bot", "확인하고 있어요…");
@@ -550,7 +884,52 @@ async function ask(question) {
     chat.pop();
   }
 }
-$("askChips").addEventListener("click", (e) => { if (e.target.tagName === "BUTTON") ask(e.target.textContent); });
+$("askChips").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) ask(b.dataset.q); });
+// 질문 카드가 화면에 보일 때는 떠 있는 버튼을 숨긴다 (같은 버튼이 두 개 보이지 않게)
+try {
+  new IntersectionObserver(([en]) => $("fab").classList.toggle("hide", en.isIntersecting), { threshold: 0.2 })
+    .observe(document.querySelector(".ask-card"));
+} catch {}
+// 말로 물어보기 (크롬 · 삼성 인터넷 등 음성 인식을 지원하는 브라우저에서만 버튼이 보임)
+const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (Speech) {
+  $("micBtn").hidden = false;
+  $("micBtn").addEventListener("click", () => {
+    const rec = new Speech();
+    rec.lang = "ko-KR"; rec.interimResults = false;
+    $("micBtn").classList.add("on");
+    $("chatForm").q.placeholder = "듣고 있어요… 말씀해 주세요";
+    rec.onresult = (ev) => { const t = ev.results[0][0].transcript.trim(); if (t) ask(t); };
+    // 안 될 때 이유를 말풍선으로 알려 준다
+    rec.onerror = (ev) => {
+      const why = {
+        "not-allowed": "마이크 사용이 막혀 있어요. 주소창 왼쪽 자물쇠(또는 ⓘ)를 눌러 마이크를 '허용'으로 바꾼 뒤 다시 눌러 주세요.",
+        "service-not-allowed": "이 브라우저에서는 말로 묻기를 쓸 수 없어요. 크롬에서 열어 주세요.",
+        "no-speech": "목소리가 들리지 않았어요. 🎤를 누르고 바로 말씀해 주세요.",
+        "audio-capture": "마이크를 찾지 못했어요. 마이크(이어폰)가 연결돼 있는지 확인해 주세요.",
+        "network": "음성 인식에 인터넷 연결이 필요해요. 연결을 확인해 주세요.",
+      }[ev.error] || `말로 묻기가 되지 않았어요 (${ev.error}). 글자로 적어 주세요.`;
+      addMsg("bot", why);
+    };
+    rec.onend = () => { $("micBtn").classList.remove("on"); $("chatForm").q.placeholder = "질문을 적어 주세요"; };
+    if (!window.isSecureContext) {           // http://192.168… 같은 주소에서는 브라우저가 마이크를 막는다
+      $("micBtn").classList.remove("on");
+      addMsg("bot", "이 주소에서는 마이크를 쓸 수 없어요. PC에서는 http://127.0.0.1:8000 으로 열거나, 휴대폰은 앱을 써 주세요.");
+      return;
+    }
+    try { rec.start(); } catch { $("micBtn").classList.remove("on"); }
+  });
+}
+$("chatChips").addEventListener("click", (e) => { if (e.target.tagName === "BUTTON") ask(e.target.textContent); });
+// 질문을 고르지 않고 바로 채팅 창 열기
+function startChat() {
+  openChat();
+  if (!$("chatLog").children.length)
+    addMsg("bot", `안녕하세요. 위의 질문을 누르시거나, 아래 칸에 궁금한 것을 적어 주세요.${Speech ? " 🎤 버튼을 누르면 말로 물어볼 수 있어요." : ""}`);
+  setTimeout(() => $("chatForm").q.focus(), 50);
+}
+$("chatStart").addEventListener("click", startChat);
+$("fab").addEventListener("click", startChat);
 $("chatForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const q = e.target.q.value.trim();
@@ -563,12 +942,22 @@ function openChat() {
 }
 
 const warmUp = () => fetch(`/donors/${encodeURIComponent(code())}/chat/warmup`, { method: "POST" }).catch(() => {});
-warmUp();                                         // 화면을 열자마자 AI 모델을 미리 준비 (기다리지 않음)
 $("donorCode").addEventListener("change", () => { chat = []; $("chatLog").innerHTML = ""; warmUp(); });
 $("donorCode").addEventListener("change", loadAll);
+$("logoutBtn").addEventListener("click", logout);
 updateNotifyAsk();
-loadAll();
-setInterval(loadAll, CHECK_EVERY_MIN * 60 * 1000);
+// 로그인한 사람: 공여자면 자기 코드로 고정, 의료진이면 공여자를 골라 볼 수 있게
+(async () => {
+  const res = await fetch("/auth/me");
+  if (!res.ok) return;
+  const me = await res.json();
+  if (me.role === "donor") displayName = me.display_name;
+  if (me.role === "donor") $("donorCode").innerHTML = `<option>${me.donor_code}</option>`;
+  else $("demoBox").hidden = false;
+  warmUp();
+  loadAll();
+  setInterval(loadAll, CHECK_EVERY_MIN * 60 * 1000);
+})();
 </script>
 </body>
 </html>

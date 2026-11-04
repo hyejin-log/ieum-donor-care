@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#EDF1F6">
+  <title>이음 · 로그인</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+  <style>
+    :root[data-theme=light] {
+      --pico-background-color: #EDF1F6; --pico-color: #22304A; --pico-primary: #3F6FE0;
+      --pico-primary-background: #17233D; --pico-primary-border: #17233D;
+      --pico-primary-hover-background: #0f1a2f; --pico-primary-hover-border: #0f1a2f;
+      --pico-font-family: "Pretendard", system-ui, sans-serif;
+    }
+    body { background: #EDF1F6; }
+    main { max-width: 420px; margin: 0 auto; padding: 40px 16px; }
+    .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.3rem; color: #17233D; margin-bottom: 4px; }
+    .logo i { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, #6E95F2, #3F6FE0); display: inline-block; }
+    .tag { color: #8792A6; font-size: .85rem; margin: 0 0 20px; }
+    article { border-radius: 22px; box-shadow: 0 10px 28px rgba(23, 35, 61, .06); }
+    .tabs { display: flex; gap: 4px; background: #F4F7FB; border-radius: 999px; padding: 4px; margin-bottom: 18px; }
+    .tabs button { flex: 1; margin: 0; padding: 8px 0; border-radius: 999px; border: none; background: none; color: #8792A6; font-weight: 700; font-size: .9rem; }
+    .tabs button.on { background: #fff; color: #17233D; box-shadow: 0 1px 3px rgba(23, 35, 61, .1); }
+    .roles { display: flex; gap: 8px; margin-bottom: 12px; }
+    .roles label { flex: 1; border: 1px solid #E3E9F1; border-radius: 14px; padding: 10px; font-size: .88rem; font-weight: 600; cursor: pointer; }
+    .roles label:has(input:checked) { border-color: #3F6FE0; background: #E3EBFC; }
+    small.help { display: block; color: #8792A6; margin: -8px 0 12px; font-size: .76rem; }
+    #msg { color: #E06A4F; font-size: .85rem; min-height: 1.2em; margin: 8px 0 0; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="logo"><i></i>이음</div>
+  <p class="tag">생체 신장 기증 이후의 건강을 끊기지 않게 잇습니다</p>
+
+  <article>
+    <div class="tabs">
+      <button id="tabLogin" class="on">로그인</button>
+      <button id="tabSignup">회원가입</button>
+    </div>
+
+    <form id="loginForm">
+      <label>아이디 <input name="username" autocomplete="username" required></label>
+      <label>비밀번호 <input name="password" type="password" autocomplete="current-password" required></label>
+      <button type="submit">로그인</button>
+    </form>
+
+    <form id="signupForm" hidden>
+      <div class="roles">
+        <label><input type="radio" name="role" value="donor" checked> 공여자</label>
+        <label><input type="radio" name="role" value="staff"> 의료진</label>
+      </div>
+      <div id="donorFields">
+        <label>공여자 코드 <input name="donor_code" placeholder="예: D-001"></label>
+        <small class="help">이식센터에서 받은 코드예요.</small>
+        <label>출생 연도 <input name="birth_year" type="number" inputmode="numeric" placeholder="예: 1965" min="1900" max="2010"></label>
+        <small class="help">본인 확인용이에요. 병원에 등록된 정보와 같아야 해요.</small>
+      </div>
+      <div id="staffFields" hidden>
+        <label>의료진 가입 코드 <input name="invite_code" type="password" autocomplete="off"></label>
+        <small class="help">병원 관리자가 알려 준 코드예요.</small>
+      </div>
+      <label>이름 <input name="display_name" required maxlength="30" placeholder="화면에 보일 이름"></label>
+      <label>아이디 <input name="username" autocomplete="username" required pattern="[a-z0-9_]{4,30}" placeholder="영어 소문자·숫자 4~30자"></label>
+      <label>비밀번호 <input name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="글자+숫자 8자 이상"></label>
+      <button type="submit">가입하고 시작하기</button>
+    </form>
+    <p id="msg"></p>
+  </article>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const errText = (d) => (typeof d.detail === "string" ? d.detail : (d.detail || []).map((x) => x.msg.replace("Value error, ", "")).join(", "));
+
+function show(tab) {
+  $("tabLogin").classList.toggle("on", tab === "login");
+  $("tabSignup").classList.toggle("on", tab === "signup");
+  $("loginForm").hidden = tab !== "login";
+  $("signupForm").hidden = tab !== "signup";
+  $("msg").textContent = "";
+}
+$("tabLogin").onclick = () => show("login");
+$("tabSignup").onclick = () => show("signup");
+$("signupForm").addEventListener("change", (e) => {
+  if (e.target.name !== "role") return;
+  const staff = e.target.value === "staff";
+  $("donorFields").hidden = staff;
+  $("staffFields").hidden = !staff;
+});
+
+async function send(url, body) {
+  $("msg").textContent = "";
+  try {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const text = await res.text();
+    let d; try { d = JSON.parse(text); } catch { d = { detail: `서버 오류 (${res.status})` }; }
+    if (!res.ok) { $("msg").textContent = errText(d); return; }
+    location.href = d.next;
+  } catch { $("msg").textContent = "서버에 연결할 수 없습니다."; }
+}
+$("loginForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  send("/auth/login", { username: f.get("username").trim(), password: f.get("password") });
+});
+$("signupForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const role = f.get("role");
+  const body = { role, username: f.get("username").trim(), password: f.get("password"), display_name: f.get("display_name").trim() };
+  if (role === "donor") { body.donor_code = f.get("donor_code").trim().toUpperCase(); body.birth_year = Number(f.get("birth_year")) || null; }
+  else body.invite_code = f.get("invite_code");
+  send("/auth/signup", body);
+});
+</script>
+</body>
+</html>

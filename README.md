@@ -31,11 +31,15 @@
 
 | 대상 | 기능 | 사용 기술 |
 |---|---|---|
-| 공여자 | 주 1회 혈압·체중 기록, 최근 12주 그래프, 다음 추적검사 D-day, 알림함·브라우저 알림 | FastAPI · PostgreSQL · Chart.js |
+| 공여자 | **하루 1회** 혈압·체중 기록(측정 방법 안내, 저장 즉시 높음·낮음 판정), 최근 12주 그래프, 다음 추적검사 D-day, 알림함 | FastAPI · PostgreSQL · Chart.js |
+| 공여자 | 검사 수치 쉬운 설명: eGFR · 크레아티닌 · 소변 단백 기준표에서 **내 수치 위치** 표시, 크레아티닌·eGFR 변화 그래프, 기증 후 **검사 여정** 설명 | 기준값 API (`/guide/reference`) |
+| 공여자 | **휴대폰 앱**: 큰 글씨, 매일 소리 알림, 블루투스 혈압계·체중계(표준 BLE) | React Native (Expo) |
+| 공통 | **로그인·회원가입**: 공여자는 본인 기록만, 의료진은 가입 코드 필요. 비밀번호 PBKDF2 해시, 세션 토큰 해시 저장, 로그인 시도 제한 | auth.py |
 | 공여자 | **안내 Agent**: 내 기록·일정 질문, 기증 후 생활 안내, 응급 증상 시 119 안내 | LLM(Groq / Ollama) · 딥러닝 문장 분류 |
 | 의료진 | 검사 결과 입력 → 해당 추적검사 **자동 완료 처리** | SQL 트랜잭션 · UPSERT |
 | 의료진 | 공여자 목록: 놓친 검사 · 검사 기간 · 경고 · 12주 기록률 · **이탈 위험 예측** | 규칙 엔진 · 머신러닝 |
-| 의료진 | **연구 데이터 엑셀 내려받기** (시트 5개) | pandas · openpyxl |
+| 의료진 | **EMR 연동**: FHIR Observation(LOINC)으로 검사 결과 자동 가져오기, 단위 변환·중복 건너뜀·추적검사 자동 완료 (모의 EMR) | FHIR R4 · LOINC |
+| 의료진 | **연구 데이터 엑셀** (시트 7개) + **eCRF 입력용 CSV · 변수 정의서** (REDCap 가져오기 형식, 숫자 코드) | pandas · openpyxl |
 
 ## 구조
 
@@ -113,7 +117,7 @@ erDiagram
 | 순서 | 판단 | 답하는 방식 | 응답 시간 |
 |---|---|---|---|
 | ① | 응급 (단어 목록 **또는** DL 분류) | 119·응급실 안내 | 즉시 |
-| ② | 일반 대화 (DL 분류) | 정해진 답 + 이번 주 기록 권유 | 즉시 |
+| ② | 일반 대화 (DL 분류) | 정해진 답 + 오늘 기록 권유 | 즉시 |
 | ③ | 안내문 주제 (진통제·운동·eGFR…) | 이식센터 안내문 그대로 | 즉시 |
 | ④ | 내 기록 (검사 일정·혈압·검사 결과) | 실제 값으로 답 | 즉시 |
 | ⑤ | 그 밖의 자유 질문 | LLM (스트리밍) | Groq 약 2~4초 |
@@ -152,6 +156,8 @@ erDiagram
 | ML · DL | scikit-learn, PyTorch (서버에서는 numpy로 추론) |
 | LLM | Groq (gpt-oss-120b), Ollama (qwen2.5:3b) — 선택 |
 | 프론트엔드 | HTML · CSS · JavaScript, Pico CSS, Chart.js |
+| 앱 | React Native (Expo), expo-notifications, expo-secure-store, react-native-ble-plx |
+| 표준 | FHIR R4 · LOINC (EMR), REDCap 가져오기 형식 (eCRF), BLE GATT 혈압 0x1810 · 체중 0x181D |
 
 ## 실행 방법
 
@@ -166,7 +172,9 @@ psql -d donor_care -f schema.sql
 psql -d donor_care -f seed_demo.sql   # 데모 공여자 D-001 ~ D-003
 
 # 3. 설정: .env.example 을 .env 로 복사하고 DB 비밀번호 등을 채운다
+#    STAFF_INVITE_CODE: 의료진 가입 코드 (비우면 의료진 가입 불가)
 #    LLM 없이도 동작합니다(규칙 답변). 자유 질문 AI를 쓰려면 GROQ_API_KEY 또는 Ollama 설정
+#    로그인용 테이블(users, sessions)은 서버가 시작할 때 자동으로 만듭니다 (migrate_auth.sql 과 같음)
 
 # 4. 서버 실행
 uvicorn main:app --reload
@@ -174,7 +182,8 @@ uvicorn main:app --reload
 
 | 주소 | 화면 |
 |---|---|
-| http://127.0.0.1:8000/ | 공여자 화면 (`?code=D-002`로 데모 공여자 선택) |
+| http://127.0.0.1:8000/login | 로그인 · 회원가입 (공여자: 공여자 코드 + 출생 연도) |
+| http://127.0.0.1:8000/ | 공여자 화면 (공여자는 본인 기록, 의료진은 공여자 선택) |
 | http://127.0.0.1:8000/staff | 의료진 목록 |
 | http://127.0.0.1:8000/dashboard?code=D-001 | 공여자 상세 |
 | http://127.0.0.1:8000/docs | API 문서 (자동 생성) |
@@ -191,11 +200,15 @@ python ml/triage_data.py && python ml/train_triage.py      # 문장 분류
 
 ```
 main.py            FastAPI 서버: API, 경고 규칙, pandas 집계, 엑셀 내보내기
+auth.py            로그인 · 회원가입 · 세션 (PBKDF2, 세션 토큰 해시)
+emr.py             EMR 연동: FHIR Observation 받기 · 해석 (모의 EMR 포함)
+ecrf.py            eCRF(REDCap) 입력용 표 · 변수 정의서
+mobile_src/        휴대폰 앱 소스 (React Native · Expo) — mobile_src/README.md
 agent.py           안내 Agent: 질문 분류, 자료 주입, LLM 호출(스트리밍), 출력 검사
 risk.py            이탈 위험 예측 (ML 계수로 계산)
 triage.py          문장 분류 (DL 가중치로 numpy 추론)
 ml/                합성 데이터 생성 · 학습 스크립트 · 학습된 모델
-static/            donor.html · staff.html · dashboard.html
+static/            donor.html · staff.html · dashboard.html · login.html
 schema.sql         테이블 설계
 seed_demo.sql      데모 데이터
 docs/              기술 스택 · 데이터베이스 학습서 (PDF)
@@ -212,15 +225,22 @@ docs/              기술 스택 · 데이터베이스 학습서 (PDF)
 | GET | `/donors/{code}/alerts` | 의료진용 경고 (혈압 · eGFR · 단백뇨 · 체중) |
 | POST | `/donors/{code}/chat/stream` | 안내 Agent (NDJSON 스트리밍) |
 | GET | `/staff/overview` | 공여자별 상태 · 경고 · 기록률 · 이탈 위험 |
-| GET | `/export/research.xlsx` | 연구 데이터 엑셀 |
+| GET | `/export/research.xlsx` | 연구 데이터 엑셀 (시트 7개) |
+| GET | `/export/ecrf.csv?kind=data` · `kind=dictionary` | eCRF 입력용 CSV · 변수 정의서 |
+| POST | `/emr/sync` | EMR(FHIR)에서 검사 결과 가져오기 |
+| GET | `/mock-emr/fhir/Observation` | 모의 EMR FHIR 검색 (가상 자료) |
+| POST | `/auth/signup` · `/auth/login` · `/auth/logout` | 회원가입 · 로그인 · 로그아웃 |
+| GET | `/guide/reference` | 검사 수치·혈압 기준값과 쉬운 설명 |
 
 ## 한계와 다음 단계
 
-- **로그인·권한 없음**: 실제 운영에는 역할별 로그인과 접근 기록(감사 로그)이 필요합니다.
+- **로그인**: 역할별 접근 제한은 있으나, 누가 어떤 기록을 봤는지 남기는 감사 로그와 HTTPS 배포가 더 필요합니다.
+- **EMR**: 모의 EMR(가상 자료)입니다. 실제 연결에는 병원 승인, SMART on FHIR 인증, 보안 심사가 필요합니다.
+- **법·윤리**: 건강정보 별도 동의, 연구 활용 시 IRB 승인과 가명처리, 외부 LLM 사용 시 국외이전 동의 검토가 필요합니다.
 - **경고 기준값·안내문**: 이식센터 의료진의 검토와 승인이 필요합니다.
 - **모델**: 실제 추적 데이터로 다시 학습하고 외부 검증이 필요합니다.
 - **개인정보**: 외부 LLM 사용 시 정보보호 검토가 필요하며, 기본값은 로컬 모델입니다.
-- **배포·푸시 알림**: 현재 브라우저 알림은 화면이 열려 있을 때만 동작합니다(서비스 워커 · Web Push 예정).
+- **알림**: 앱은 매일 소리 알림(기기 안 예약). 미기록 공여자에게 카카오 알림톡·문자를 보내는 기능은 사업자 채널 등록 후 연결 예정입니다.
 
 ---
 
