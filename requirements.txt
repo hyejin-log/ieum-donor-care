@@ -5,4 +5,5 @@ python-dotenv
 pydantic
 pandas
 openpyxl
+# scikit-learn  # ML 모델을 다시 학습할 때만 (python ml/train.py)
 # anthropic   # Claude API를 쓸 때만 설치

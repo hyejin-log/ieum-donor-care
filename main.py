@@ -6,6 +6,7 @@ from typing import Literal
 
 import pandas as pd
 import agent
+import risk
 import psycopg
 from psycopg.rows import dict_row
 from dotenv import load_dotenv
@@ -508,7 +509,7 @@ def staff_overview():
     with get_conn() as conn:
         weekly = weekly_records(conn, today)                 # 공여자 × 최근 12주 기록 여부 (pandas)
         donors = conn.execute(
-            "SELECT donor_id, donor_code, donation_date, predonation_egfr FROM donors ORDER BY donor_code"
+            "SELECT donor_id, donor_code, birth_year, donation_date, predonation_egfr FROM donors ORDER BY donor_code"
         ).fetchall()
         for d in donors:
             visits = load_visits(conn, d["donor_id"], today)
@@ -550,6 +551,10 @@ def staff_overview():
                 "weekly_records": [bool(x) for x in weekly.loc[d["donor_code"]]],
                 "record_rate_percent": round(weekly.loc[d["donor_code"]].mean() * 100),
                 "alerts": alerts,
+                # ML: 다음 추적검사를 놓칠 위험 (합성 데이터로 학습한 시연용 모델)
+                "dropout_risk": risk.predict(risk.donor_features(
+                    visits, float(weekly.loc[d["donor_code"]].mean()), weeks_since_home,
+                    d["donation_date"], d["birth_year"], any(a["kind"] == "bp" for a in alerts), today)),
             })
 
     order = {"missed": 0, "window": 1, "ok": 2}

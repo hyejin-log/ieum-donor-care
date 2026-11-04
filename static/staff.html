@@ -88,6 +88,10 @@
     .alert.urgent { background: var(--warn); color: #fff; }
     .alert.warn { background: var(--amber-soft); color: var(--amber); }
     .alert.info { background: var(--soft); color: var(--muted); }
+    .risk { display: inline-block; margin-top: 5px; font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+    .risk.low { background: var(--soft); color: var(--muted); }
+    .risk.mid { background: var(--amber-soft); color: var(--amber); }
+    .risk.high { background: var(--warn-soft); color: var(--warn); }
     .top-links { display: flex; gap: 18px; align-items: center; }
   </style>
 </head>
@@ -204,6 +208,9 @@ function row(r) {
   // 경고: 즉시 확인(빨강) · 주의(노랑) · 참고(회색). 마우스를 올리면 자세한 값
   const alerts = r.alerts.length ? `<div class="alerts">${r.alerts.map((a) =>
     `<span class="alert ${a.level}" title="${a.detail}">${a.level === "urgent" ? "! " : ""}${a.title}</span>`).join("")}</div>` : "";
+  // ML: 다음 추적검사를 놓칠 위험 (마우스를 올리면 이유)
+  const rk = r.dropout_risk;
+  const riskChip = rk ? `<div><span class="risk ${rk.level}" title="${rk.reasons.length ? "주요 이유: " + rk.reasons.join(", ") : "두드러진 위험 요인 없음"} · 합성 데이터로 학습한 시연용 모델">이탈 위험 ${rk.percent}% · ${{ low: "낮음", mid: "보통", high: "높음" }[rk.level]}</span></div>` : "";
   const nv = r.next_visit;
   const next = nv ? `${nv.visit_name}<div class="muted">${dot(nv.due_date)} · ${nv.d_day >= 0 ? "D-" + nv.d_day : "D+" + -nv.d_day}</div>` : "-";
   const egfr = r.latest_egfr != null
@@ -220,7 +227,7 @@ function row(r) {
   return `<tr>
     <td><span class="code">${r.donor_code}</span><div class="muted">기증 후 ${r.days_since_donation}일</div></td>
     <td><span class="pill ${r.status}">${STATUS[r.status]}</span>${statusDetail ? `<div class="muted">${statusDetail}</div>` : ""}${alerts}</td>
-    <td>${next}</td>
+    <td>${next}${riskChip}</td>
     <td>${egfr}</td>
     <td>${gap}${rate}<div class="weeks" title="최근 12주 기록 (오른쪽이 이번 주)">${weeks}</div></td>
     <td><div class="row-actions">

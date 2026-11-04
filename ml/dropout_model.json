@@ -1,0 +1,61 @@
+{
+ "name": "추적검사 이탈 위험 (로지스틱 회귀)",
+ "trained_on": "합성 데이터 (synthetic_donors.csv) · 임상 검증 전 시연용",
+ "trained_at": "2026-11-04",
+ "features": [
+  "record_rate_12w",
+  "weeks_since_home",
+  "prior_missed",
+  "mean_delay_days",
+  "years_since_donation",
+  "age",
+  "bp_alert"
+ ],
+ "mean": [
+  0.561127,
+  2.794667,
+  0.526667,
+  18.736,
+  2.658447,
+  45.863333,
+  0.145333
+ ],
+ "scale": [
+  0.265124,
+  4.512409,
+  0.883151,
+  19.634688,
+  1.327835,
+  10.875262,
+  0.352437
+ ],
+ "coef": [
+  -0.495619,
+  0.389911,
+  0.893788,
+  0.200046,
+  0.241039,
+  -0.241022,
+  0.048147
+ ],
+ "intercept": -0.85915,
+ "metrics": {
+  "logistic": {
+   "cv_auc_mean": 0.812,
+   "cv_auc_std": 0.03,
+   "test_auc": 0.803,
+   "test_brier": 0.164
+  },
+  "random_forest": {
+   "cv_auc_mean": 0.801,
+   "cv_auc_std": 0.032,
+   "test_auc": 0.797,
+   "test_brier": 0.164
+  }
+ },
+ "base_rate": 0.324,
+ "levels": {
+  "low": 0.2,
+  "high": 0.4
+ }
+}
