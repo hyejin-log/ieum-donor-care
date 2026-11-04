@@ -22,6 +22,16 @@ REMIND_DAYS = 30
 # 자가 기록률을 계산하는 기간 (최근 12주)
 RECENT_WEEKS = 12
 
+# ---------- 경고 규칙의 기준값 ----------
+# 데모용 기준값이다. 실제 운영 전에는 이식센터 의료진의 검토와 승인이 필요하다.
+BP_HOME_SYS, BP_HOME_DIA = 135, 85        # 가정혈압 고혈압 기준 (최근 2회 평균)
+BP_CRISIS_SYS, BP_CRISIS_DIA = 180, 110   # 한 번이라도 이 이상이면 즉시 확인
+EGFR_LOW = 45                             # eGFR 45 미만 (CKD 3b 단계 이하)
+EGFR_DROP_PERCENT = 20                    # 직전 검사보다 20% 이상 감소
+PROTEIN_WARN = {"1+"}                     # 소변 단백 1+ 는 주의
+PROTEIN_URGENT = {"2+", "3+"}             # 2+ 이상은 즉시 확인
+WEIGHT_GAIN_PERCENT = 5                   # 최근 12주 사이 체중 5% 이상 증가
+
 
 def get_conn():
     """데이터베이스에 접속한다. 결과는 {칸 이름: 값} 형태로 받는다."""
@@ -71,6 +81,84 @@ def load_visits(conn, donor_id: int, today: date) -> list[dict]:
     for v in visits:
         v["status"] = visit_status(v["due_date"], v["completed_date"], today)
     return visits
+
+
+# ---------- 경고 규칙 ----------
+
+def donor_alerts(home: list[dict], labs: list[dict]) -> list[dict]:
+    """
+    자가 기록과 검사 결과로 경고 목록을 계산한다. DB를 보지 않는 순수 함수.
+    home: 최근 12주 자가 기록 (측정일순), labs: 전체 검사 결과 (검사일순)
+    level: urgent(즉시 확인) / warn(주의) / info(참고)
+    """
+    alerts = []
+
+    # 혈압: 매우 높은 값이 한 번이라도 있으면 urgent
+    for r in home:
+        sys_, dia = r["systolic_bp"], r["diastolic_bp"]
+        if (sys_ or 0) >= BP_CRISIS_SYS or (dia or 0) >= BP_CRISIS_DIA:
+            alerts.append({"id": f"bp-crisis-{r['measured_at']}", "level": "urgent", "kind": "bp",
+                           "title": "혈압이 매우 높게 측정됨",
+                           "detail": f"{r['measured_at']} · {sys_}/{dia} mmHg"})
+
+    # 혈압: 최근 2회 평균이 가정혈압 기준 이상이면 warn
+    bp = [r for r in home if r["systolic_bp"] is not None and r["diastolic_bp"] is not None][-2:]
+    if len(bp) == 2:
+        avg_sys = sum(r["systolic_bp"] for r in bp) / 2
+        avg_dia = sum(r["diastolic_bp"] for r in bp) / 2
+        if avg_sys >= BP_HOME_SYS or avg_dia >= BP_HOME_DIA:
+            alerts.append({"id": f"bp-high-{bp[-1]['measured_at']}", "level": "warn", "kind": "bp",
+                           "title": "최근 2회 혈압 평균이 높음",
+                           "detail": f"평균 {avg_sys:.0f}/{avg_dia:.0f} mmHg (기준 {BP_HOME_SYS}/{BP_HOME_DIA})"})
+
+    # 체중: 기간 첫 기록 대비 마지막 기록이 5% 이상 증가하면 info
+    w = [r for r in home if r["weight_kg"] is not None]
+    if len(w) >= 2 and float(w[0]["weight_kg"]) > 0:
+        gain = (float(w[-1]["weight_kg"]) - float(w[0]["weight_kg"])) / float(w[0]["weight_kg"]) * 100
+        if gain >= WEIGHT_GAIN_PERCENT:
+            alerts.append({"id": f"weight-{w[-1]['measured_at']}", "level": "info", "kind": "weight",
+                           "title": "체중이 늘고 있음",
+                           "detail": f"{w[0]['weight_kg']} → {w[-1]['weight_kg']} kg (+{gain:.1f}%)"})
+
+    # 검사 결과: 가장 최근 결과만 판단 (예전 결과는 이미 확인된 것으로 본다)
+    egfr_labs = [l for l in labs if l["egfr"] is not None]
+    if egfr_labs:
+        last = egfr_labs[-1]
+        if last["egfr"] < EGFR_LOW:
+            alerts.append({"id": f"egfr-low-{last['tested_at']}", "level": "urgent", "kind": "lab",
+                           "title": f"eGFR {EGFR_LOW} 미만",
+                           "detail": f"{last['tested_at']} · eGFR {last['egfr']}"})
+        if len(egfr_labs) >= 2:
+            prev = egfr_labs[-2]
+            drop = (prev["egfr"] - last["egfr"]) / prev["egfr"] * 100
+            if drop >= EGFR_DROP_PERCENT:
+                alerts.append({"id": f"egfr-drop-{last['tested_at']}", "level": "warn", "kind": "lab",
+                               "title": "eGFR이 직전 검사보다 크게 감소",
+                               "detail": f"{prev['egfr']} → {last['egfr']} (-{drop:.0f}%)"})
+    if labs and labs[-1]["urine_protein"] in PROTEIN_WARN | PROTEIN_URGENT:
+        last = labs[-1]
+        urgent = last["urine_protein"] in PROTEIN_URGENT
+        alerts.append({"id": f"protein-{last['tested_at']}", "level": "urgent" if urgent else "warn",
+                       "kind": "lab", "title": "소변 단백 양성",
+                       "detail": f"{last['tested_at']} · {last['urine_protein']}"})
+
+    order = {"urgent": 0, "warn": 1, "info": 2}
+    return sorted(alerts, key=lambda a: order[a["level"]])
+
+
+def load_alerts(conn, donor_id: int, today: date) -> list[dict]:
+    """경고 계산에 필요한 기록을 DB에서 읽어 donor_alerts에 넘긴다."""
+    since = week_start(today) - timedelta(weeks=RECENT_WEEKS - 1)
+    home = conn.execute(
+        "SELECT measured_at, systolic_bp, diastolic_bp, weight_kg FROM home_measurements "
+        "WHERE donor_id = %s AND measured_at >= %s ORDER BY measured_at",
+        (donor_id, since),
+    ).fetchall()
+    labs = conn.execute(
+        "SELECT tested_at, egfr, urine_protein FROM lab_results WHERE donor_id = %s ORDER BY tested_at",
+        (donor_id,),
+    ).fetchall()
+    return donor_alerts(home, labs)
 
 
 # ---------- 화면 ----------
@@ -277,6 +365,14 @@ def list_labs(donor_code: str):
         ).fetchall()
 
 
+@app.get("/donors/{donor_code}/alerts")
+def list_alerts(donor_code: str):
+    """의료진용 경고 목록 (혈압 · 체중 · 검사 결과 규칙)"""
+    with get_conn() as conn:
+        donor = get_donor(conn, donor_code)
+        return load_alerts(conn, donor["donor_id"], date.today())
+
+
 # ---------- 공여자 알림 ----------
 
 @app.get("/donors/{donor_code}/notifications")
@@ -294,6 +390,7 @@ def donor_notifications(donor_code: str):
             "SELECT max(measured_at) AS d FROM home_measurements WHERE donor_id = %s",
             (donor["donor_id"],),
         ).fetchone()["d"]
+        bp_alerts = [a for a in load_alerts(conn, donor["donor_id"], today) if a["kind"] == "bp"]
         recent_labs = conn.execute(
             "SELECT lab_id, tested_at FROM lab_results "
             "WHERE donor_id = %s AND created_at >= now() - interval '14 days' "
@@ -321,6 +418,15 @@ def donor_notifications(donor_code: str):
         items.append({"id": f"weekly-{this_week.isoformat()}", "level": "info",
                       "title": "이번 주 혈압·체중을 기록해 주세요",
                       "body": "아직 기록이 없어요." if weeks is None else f"마지막 기록은 {weeks}주 전이에요."})
+
+    # 혈압 경고만 공여자에게도 보여준다. 검사 결과 해석은 의료진이 전달한다.
+    for a in bp_alerts:
+        if a["level"] == "urgent":
+            items.insert(0, {"id": a["id"], "level": "urgent", "title": "혈압이 매우 높게 측정되었어요",
+                             "body": "잠시 쉬고 다시 재 보세요. 계속 높거나 두통·가슴 통증이 있으면 바로 병원에 연락해 주세요."})
+        else:
+            items.append({"id": a["id"], "level": "warn", "title": "최근 혈압이 높게 측정되고 있어요",
+                          "body": "같은 시간에 다시 재 보고, 계속 높으면 이식센터에 알려 주세요."})
 
     for lab in recent_labs:
         items.append({"id": f"lab-{lab['lab_id']}", "level": "ok",
@@ -358,6 +464,7 @@ def staff_overview():
             window = [v for v in visits if v["status"] == "window"]
             nxt = next((v for v in visits if v["status"] in ("window", "upcoming")), None)
             weeks_since_home = None if last_home is None else (this_week - week_start(last_home)).days // 7
+            alerts = load_alerts(conn, d["donor_id"], today)
             status = "missed" if missed else "window" if window else "ok"
             percent = None
             if latest and d["predonation_egfr"]:
@@ -380,10 +487,13 @@ def staff_overview():
                 "weeks_since_home": weeks_since_home,
                 "weekly_records": [bool(x) for x in weekly.loc[d["donor_code"]]],
                 "record_rate_percent": round(weekly.loc[d["donor_code"]].mean() * 100),
+                "alerts": alerts,
             })
 
     order = {"missed": 0, "window": 1, "ok": 2}
-    rows.sort(key=lambda r: (order[r["status"]], -(r["weeks_since_home"] or 0)))
+    urgent = lambda r: sum(a["level"] == "urgent" for a in r["alerts"])
+    warn = lambda r: sum(a["level"] == "warn" for a in r["alerts"])
+    rows.sort(key=lambda r: (order[r["status"]], -urgent(r), -warn(r), -(r["weeks_since_home"] or 0)))
     return rows
 
 
@@ -467,6 +577,10 @@ def build_research_tables(conn, today: date) -> dict[str, pd.DataFrame]:
         "mean_systolic_bp": recent.groupby("donor_code")["systolic_bp"].mean(),
     }).rename_axis("donor_code").reset_index()
 
+    # 경고: 공여자마다 경고 제목을 한 칸에 이어 적는다
+    donors["alerts"] = [", ".join(a["title"] for a in load_alerts(conn, int(i), today))
+                        for i in donors["donor_id"]]
+
     summary = (donors.drop(columns="donor_id")
                .merge(latest, on="donor_code", how="left")
                .merge(adherence, on="donor_code", how="left")
@@ -482,7 +596,7 @@ def build_research_tables(conn, today: date) -> dict[str, pd.DataFrame]:
     summary = summary[["donor_code", "birth_year", "sex", "donation_date", "days_since_donation",
                        "predonation_egfr", "latest_egfr", "latest_egfr_date", "egfr_percent",
                        "weeks_recorded", "record_rate_percent", "mean_systolic_bp",
-                       "completed_visits", "missed_visits"]]
+                       "completed_visits", "missed_visits", "alerts"]]
 
     return {
         "공여자 요약": summary.rename(columns={
@@ -491,7 +605,7 @@ def build_research_tables(conn, today: date) -> dict[str, pd.DataFrame]:
             "latest_egfr": "최근 eGFR", "latest_egfr_date": "최근 eGFR 검사일", "egfr_percent": "기증 전 대비 %",
             "weeks_recorded": f"최근 {RECENT_WEEKS}주 중 기록한 주", "record_rate_percent": "기록률 %",
             "mean_systolic_bp": "평균 수축기 혈압", "completed_visits": "완료 추적검사",
-            "missed_visits": "놓친 추적검사"}),
+            "missed_visits": "놓친 추적검사", "alerts": "경고"}),
         "검사 결과": labs.rename(columns={
             "donor_code": "공여자", "tested_at": "검사일", "creatinine": "크레아티닌", "egfr": "eGFR",
             "urine_protein": "소변 단백", "visit_name": "추적검사", "entered_by": "입력자"}),
