@@ -1,4 +1,5 @@
 import io
+import json
 import os
 from datetime import date, timedelta
 from typing import Literal
@@ -447,6 +448,16 @@ class ChatIn(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1, max_length=20)   # 최근 대화만 보낸다
 
 
+def chat_tools(donor_code: str) -> dict:
+    """Agent가 쓸 조회 함수. 공여자 코드를 여기서 고정하므로 다른 공여자의 기록은 볼 수 없다."""
+    return {
+        "get_donation_summary": lambda: donor_summary(donor_code),
+        "get_home_records": lambda: list_home(donor_code)[-12:],
+        "get_lab_results": lambda: list_labs(donor_code),
+        "get_notifications": lambda: donor_notifications(donor_code),
+    }
+
+
 @app.post("/donors/{donor_code}/chat")
 def donor_chat(donor_code: str, chat: ChatIn):
     """공여자 질문에 안내 Agent가 답한다. 도구는 이 공여자의 기록만 조회하도록 고정한다."""
@@ -455,21 +466,35 @@ def donor_chat(donor_code: str, chat: ChatIn):
     if chat.messages[-1].role != "user":
         raise HTTPException(status_code=422, detail="마지막 메시지는 질문이어야 합니다")
 
-    impl = {
-        "get_donation_summary": lambda: donor_summary(donor_code),
-        "get_home_records": lambda: list_home(donor_code)[-12:],
-        "get_lab_results": lambda: list_labs(donor_code),
-        "get_notifications": lambda: donor_notifications(donor_code),
-    }
+    impl = chat_tools(donor_code)
     result = agent.run_agent([m.model_dump() for m in chat.messages], impl)
     result["disclaimer"] = agent.DISCLAIMER
     return result
 
 
-@app.post("/agent/warmup")
-def agent_warmup():
-    """대화 창을 열 때 호출: 로컬 모델을 미리 불러 둔다."""
-    return {"ready": agent.warm_up()}
+@app.post("/donors/{donor_code}/chat/stream")
+def donor_chat_stream(donor_code: str, chat: ChatIn):
+    """donor_chat과 같지만, 답을 만들어지는 대로 한 줄씩(NDJSON) 보낸다."""
+    with get_conn() as conn:
+        get_donor(conn, donor_code)
+    if chat.messages[-1].role != "user":
+        raise HTTPException(status_code=422, detail="마지막 메시지는 질문이어야 합니다")
+    impl = chat_tools(donor_code)
+    messages = [m.model_dump() for m in chat.messages]
+
+    def lines():
+        for event in agent.run_agent_stream(messages, impl):
+            yield json.dumps(event, ensure_ascii=False, default=str) + "\n"
+
+    return StreamingResponse(lines(), media_type="application/x-ndjson")
+
+
+@app.post("/donors/{donor_code}/chat/warmup")
+def agent_warmup(donor_code: str):
+    """대화 창을 열 때 호출: 로컬 모델에 이 공여자의 자료를 미리 읽혀 둔다."""
+    with get_conn() as conn:
+        get_donor(conn, donor_code)
+    return {"ready": agent.warm_up(chat_tools(donor_code))}
 
 
 # ---------- 의료진: 전체 공여자 현황 ----------

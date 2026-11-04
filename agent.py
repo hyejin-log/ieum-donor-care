@@ -180,13 +180,12 @@ def ollama_chat(payload: dict) -> dict:
 
 # 작은 로컬 모델은 도구 호출을 자주 빼먹고 값을 지어낸다(실제 확인함).
 # 그래서 Ollama에서는 서버가 필요한 기록을 먼저 모아 '자료'로 넣어 주고, 모델은 문장만 만들게 한다.
-LOCAL_RULES = """
-[답변 규칙]
-- 아래 [자료]에 있는 값과 날짜만 사용하세요. [자료]에 없는 숫자는 절대 만들지 마세요.
-- 수치가 정상인지, 괜찮은지 판단하지 마세요. "정상", "괜찮아요", "문제없어요" 같은 말을 쓰지 마세요.
-- [자료]의 알림에 혈압 주의가 있으면 그 내용을 꼭 전하세요.
-- 앱과 기증 후 관리에 관한 질문이 아니면 "죄송해요, 이음 안내는 기증 후 관리와 앱 사용에 대해서만 답할 수 있어요."라고만 답하세요.
-- 3~5문장, 한국어 존댓말."""
+# 로컬 모델은 CPU에서 '읽는 시간'이 대부분이라(실측: 첫 글자까지 약 60초) 지시문과 자료를 짧게 유지한다.
+LOCAL_SYSTEM = """너는 신장 기증자 앱 '이음'의 안내 도우미다. 상대는 신장을 기증한 공여자 본인이다.
+- [자료]의 값과 날짜만 쓰고, 없는 숫자는 만들지 마라.
+- 수치가 정상인지 판단하지 말고, 진단·약 결정은 하지 말고, 필요하면 담당 의료진과 상의하라고 안내하라.
+- 기증 후 몸 상태, 생활, 검사, 기록에 관한 질문은 모두 답한다. 그 밖의 주제만 "죄송해요, 이음 안내는 기증 후 관리와 앱 사용에 대해서만 답할 수 있어요."라고 답한다.
+- 한국어 존댓말로 3~4문장."""
 
 BANNED = ["정상 범위", "정상입니다", "정상이에요", "괜찮아 보", "문제없", "문제 없", "건강하십니다"]
 
@@ -195,7 +194,7 @@ BANNED = ["정상 범위", "정상입니다", "정상이에요", "괜찮아 보"
 GUIDE_KEYWORDS = {
     "진통제": ["진통제", "타이레놀", "이부프로펜", "소염제", "약 먹", "약먹", "두통약"],
     "혈압 측정": ["어떻게 재", "재는 법", "재는법", "측정 방법", "측정법", "언제 재"],
-    "생활 습관": ["운동", "음식", "식단", "술", "담배", "영양제", "보충제"],
+    "생활 습관": ["운동", "음식", "식단", "술", "담배", "영양제", "보충제", "물은", "물을", "물 마", "수분", "짜게", "소금"],
     "eGFR": ["egfr", "신장 기능", "콩팥 기능", "신기능"],
     "기록 방법": ["기록 방법", "어떻게 기록", "입력 방법"],
     "연락처": ["연락처", "전화번호", "어디로 연락"],
@@ -223,17 +222,12 @@ def build_context(question: str, impl: dict) -> tuple[dict, list[str]]:
         state = {"missed": "아직 받지 않음(기간 지남)", "window": "지금 검사 기간", "upcoming": "예정"}[nxt["status"]]
         next_text = f"{nxt['visit_name']} · 예정일 {nxt['due_date']} · {state}"
     ctx = {
-        "다음에 받아야 할 추적검사": next_text,
-        "오늘 기준 기증 후 일수": s["days_since_donation"],
-        "기증일": s["donation_date"],
-        "추적검사 일정": [{"검사": v["visit_name"], "예정일": v["due_date"], "완료일": v["completed_date"],
-                     "상태": {"done": "완료", "missed": "놓침", "window": "지금 검사 기간",
-                            "upcoming": "예정"}[v["status"]]} for v in s["visits"]],
-        "최근 자가 기록(최대 4개)": [{"날짜": r["measured_at"], "혈압": f"{r['systolic_bp']}/{r['diastolic_bp']}",
-                                "체중": r["weight_kg"]} for r in home[-4:]],
-        "최근 병원 검사": ({"검사일": labs[-1]["tested_at"], "eGFR": labs[-1]["egfr"],
-                       "기증 전 대비 %": s["egfr_percent_of_predonation"],
-                       "소변 단백": labs[-1]["urine_protein"]} if labs else "없음"),
+        "기증 후 일수": s["days_since_donation"],
+        "다음 추적검사": next_text,
+        "최근 혈압": [f"{r['measured_at']} {r['systolic_bp']}/{r['diastolic_bp']}" for r in home[-2:]],
+        "최근 체중": (f"{home[-1]['measured_at']} {home[-1]['weight_kg']}kg" if home else "없음"),
+        "최근 병원 검사": (f"{labs[-1]['tested_at']} eGFR {labs[-1]['egfr']}(기증 전의 {s['egfr_percent_of_predonation']}%), "
+                       f"소변 단백 {labs[-1]['urine_protein']}" if labs else "없음"),
         "지금 알림": [n["title"] for n in impl["get_notifications"]()],
     }
     hits = {k: v for k, v in GUIDE.items() if k.replace(" ", "") in question.replace(" ", "")}
@@ -242,15 +236,37 @@ def build_context(question: str, impl: dict) -> tuple[dict, list[str]]:
     return ctx, used
 
 
-def warm_up() -> bool:
-    """모델을 미리 메모리에 올려 첫 답변을 빠르게 한다. 대화 창을 열 때 호출."""
+def warm_up(impl: dict | None = None) -> bool:
+    """
+    모델을 메모리에 올리고, 공여자 자료가 있으면 그 앞부분을 미리 읽혀 둔다(답은 1글자만 만들게 함).
+    대화 창을 열 때 호출하면, 실제 질문에서는 질문 부분만 새로 읽으면 된다.
+    """
     if LLM_PROVIDER != "ollama":
         return False
+    convo = local_messages([], impl)[0] if impl else []
     try:
-        ollama_chat({"model": OLLAMA_MODEL, "messages": [], "stream": False, "keep_alive": "30m"})
+        ollama_chat({"model": OLLAMA_MODEL, "messages": convo + ([{"role": "user", "content": "안녕"}] if convo else []),
+                     "stream": False, "keep_alive": "30m",
+                     "options": {"temperature": 0.1, "num_predict": 1, "num_ctx": 2048}})
         return True
     except Exception:
         return False
+
+
+def local_messages(messages: list[dict], impl: dict) -> tuple[list[dict], list[str]]:
+    """
+    로컬 모델에 보낼 메시지. 앞부분(지시문 + 이 공여자의 자료)은 질문이 바뀌어도 같게 유지한다.
+    Ollama는 앞부분이 같으면 이미 읽은 내용을 재사용하므로, 대화 창을 열 때 미리 읽혀 두면(warm_up) 답이 빨라진다.
+    """
+    question = messages[-1]["content"] if messages else ""
+    ctx, used = build_context(question, impl)
+    guide = ctx.pop("안내문", None)
+    system = LOCAL_SYSTEM + "\n[자료] " + json.dumps(ctx, ensure_ascii=False, default=str, separators=(",", ":"))
+    convo = [{"role": "system", "content": system}]
+    if guide:                                                    # 질문에 따라 달라지는 안내문은 뒤에 붙인다
+        convo.append({"role": "system", "content": "[안내문] " + json.dumps(guide, ensure_ascii=False)})
+    convo += [{"role": m["role"], "content": m["content"]} for m in messages[-6:]]
+    return convo, used
 
 
 def run_ollama(messages: list[dict], impl: dict) -> dict:
@@ -261,10 +277,7 @@ def run_ollama(messages: list[dict], impl: dict) -> dict:
     rec = record_answer(question, impl)
     if rec:
         return rec
-    ctx, used = build_context(question, impl)
-    system = SYSTEM_PROMPT + "\n" + LOCAL_RULES + "\n\n[자료]\n" + json.dumps(ctx, ensure_ascii=False, default=str, separators=(",", ":"))
-    convo = [{"role": "system", "content": system}] + \
-            [{"role": m["role"], "content": m["content"]} for m in messages[-6:]]
+    convo, used = local_messages(messages, impl)
     try:
         resp = ollama_chat({"model": OLLAMA_MODEL, "messages": convo, "stream": False,
                             "keep_alive": "30m",                       # 모델을 30분간 메모리에 유지
@@ -281,6 +294,71 @@ def run_ollama(messages: list[dict], impl: dict) -> dict:
         fallback["mode"] = "guarded"
         return fallback
     return {"reply": text, "tools_used": used, "mode": "llm"}
+
+
+# ---------- 4-3) 스트리밍: 글자가 생기는 대로 화면에 보내기 ----------
+# 이벤트(딕셔너리)를 하나씩 내보내는 제너레이터. 서버는 이를 한 줄에 하나씩 JSON으로 보낸다(NDJSON).
+#   {"type": "meta", "mode": ..., "tools_used": [...]}   어떤 방식으로 답하는지
+#   {"type": "delta", "text": "..."}                       새로 생긴 글자
+#   {"type": "replace", "text": "...", "mode": "guarded"}  출력 검사에 걸려 답을 통째로 바꿀 때
+#   {"type": "done"}
+
+def _whole(answer: dict):
+    """미리 완성된 답(안전 안내, 안내문, 내 기록, 데모)을 스트리밍 형식으로 보낸다."""
+    yield {"type": "meta", "mode": answer["mode"], "tools_used": answer["tools_used"]}
+    yield {"type": "delta", "text": answer["reply"]}
+    yield {"type": "done"}
+
+
+def run_agent_stream(messages: list[dict], impl: dict):
+    question = messages[-1]["content"]
+    if is_emergency(question):                                   # 안전장치는 항상 먼저
+        yield from _whole({"reply": EMERGENCY_REPLY, "tools_used": [], "mode": "safety"})
+        return
+    if LLM_PROVIDER != "ollama":                                 # Claude API·데모는 한 번에 보낸다
+        yield from _whole(run_agent(messages, impl))
+        return
+
+    topic = guide_direct(question)
+    if topic:
+        yield from _whole({"reply": GUIDE[topic], "tools_used": ["search_guide"], "mode": "guide"})
+        return
+    rec = record_answer(question, impl)
+    if rec:
+        yield from _whole(rec)
+        return
+
+    convo, used = local_messages(messages, impl)
+    payload = {"model": OLLAMA_MODEL, "messages": convo, "stream": True, "keep_alive": "30m",
+               "options": {"temperature": 0.1, "num_predict": 220, "num_ctx": 2048}}
+    req = urllib.request.Request(f"{OLLAMA_URL}/api/chat", data=json.dumps(payload).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"})
+    text = ""
+    try:
+        with urllib.request.urlopen(req, timeout=OLLAMA_TIMEOUT) as res:
+            yield {"type": "meta", "mode": "llm", "tools_used": used}
+            for line in res:                                     # Ollama도 한 줄에 조각 하나씩 보낸다
+                if not line.strip():
+                    continue
+                chunk = json.loads(line)
+                piece = chunk.get("message", {}).get("content", "")
+                if piece:
+                    text += piece
+                    yield {"type": "delta", "text": piece}
+                if chunk.get("done"):
+                    break
+    except (urllib.error.URLError, TimeoutError, ConnectionError, json.JSONDecodeError):
+        fb = demo_answer(question, impl)
+        yield {"type": "replace", "mode": fb["mode"],
+               "text": "(AI 모델에 연결하지 못해 데모 답변을 보여 드려요) " + fb["reply"]}
+        yield {"type": "done"}
+        return
+
+    # 출력 검사는 다 만든 뒤에 한다. 걸리면 화면의 답을 정해진 답으로 바꾼다.
+    if not text.strip() or any(b in text for b in BANNED):
+        fb = demo_answer(question, impl)
+        yield {"type": "replace", "mode": "guarded", "text": fb["reply"]}
+    yield {"type": "done"}
 
 
 # ---------- 5) 데모 모드: API 키가 없을 때의 간단한 규칙 답변 ----------

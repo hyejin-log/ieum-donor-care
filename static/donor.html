@@ -509,19 +509,43 @@ async function ask(question) {
     addMsg("bot", `안녕하세요, ${code()}님. 기록과 일정, 기증 후 생활에 대해 물어보세요.`);
   addMsg("user", question);
   chat.push({ role: "user", content: question });
-  const waiting = addMsg("bot", "확인하고 있어요…");
+  const box = addMsg("bot", "확인하고 있어요…");
+  let text = "", mode = "", started = false;
+  const show = () => {                       // 지금까지 받은 글자를 말풍선에 그린다
+    box.className = `msg bot ${mode === "safety" ? "safety" : ""}`;
+    box.innerHTML = escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      + (mode ? `<span class="meta">${MODE_LABEL[mode] || mode}</span>` : "");
+    $("chatLog").scrollTop = $("chatLog").scrollHeight;
+  };
   try {
-    const res = await fetch(`/donors/${encodeURIComponent(code())}/chat`, {
+    const res = await fetch(`/donors/${encodeURIComponent(code())}/chat/stream`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: chat.slice(-10) }),     // 최근 10개만 보낸다
+      body: JSON.stringify({ messages: chat.slice(-10) }),
     });
-    const data = await readJson(res);
-    waiting.remove();
-    if (!res.ok) { addMsg("bot", "답변 실패: " + errText(data)); chat.pop(); return; }
-    addMsg("bot", data.reply, data.mode);
-    chat.push({ role: "assistant", content: data.reply });
+    if (!res.ok) { box.remove(); addMsg("bot", "답변 실패: " + errText(await readJson(res))); chat.pop(); return; }
+
+    // 응답을 조각조각 읽는다. 한 줄 = 이벤트 하나(JSON)
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();                      // 아직 다 안 온 마지막 줄은 남겨 둔다
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "meta") { mode = ev.mode; if (mode === "llm") { box.innerHTML = "답을 쓰고 있어요…"; } }
+        if (ev.type === "delta") { if (!started) { text = ""; started = true; } text += ev.text; show(); }
+        if (ev.type === "replace") { text = ev.text; mode = ev.mode; started = true; show(); }
+      }
+    }
+    if (!started) { text = "답변을 만들지 못했어요. 다시 질문해 주세요."; show(); }
+    chat.push({ role: "assistant", content: text });
   } catch {
-    waiting.remove();
+    box.remove();
     addMsg("bot", "서버에 연결할 수 없습니다.");
     chat.pop();
   }
@@ -535,7 +559,7 @@ $("chatForm").addEventListener("submit", (e) => {
 $("closeChat").addEventListener("click", () => $("chatDialog").close());
 function openChat() {
   $("chatDialog").showModal();
-  fetch("/agent/warmup", { method: "POST" }).catch(() => {});   // 모델 미리 불러오기 (기다리지 않음)
+  fetch(`/donors/${encodeURIComponent(code())}/chat/warmup`, { method: "POST" }).catch(() => {});   // 내 자료를 모델에 미리 읽혀 두기 (기다리지 않음)
 }
 
 $("donorCode").addEventListener("change", () => { chat = []; $("chatLog").innerHTML = ""; });
