@@ -15,6 +15,8 @@ import os
 import urllib.error
 import urllib.request
 
+import triage                # 딥러닝 문장 분류 (응급 / 문의 / 일반)
+
 try:
     import anthropic
 except ImportError:          # 패키지가 없으면 데모 모드로만 동작
@@ -40,9 +42,24 @@ EMERGENCY_REPLY = (
 )
 
 
-def is_emergency(text: str) -> bool:
+def keyword_emergency(text: str) -> bool:
     t = text.replace(" ", "")
     return any(w.replace(" ", "") in t for w in EMERGENCY_WORDS)
+
+
+def safety_check(text: str) -> dict:
+    """
+    응급 판단 2중 안전장치: ① 단어 목록  ② 딥러닝 문장 분류 (단어 목록에 없는 표현을 보완)
+    둘 중 하나라도 응급이면 응급으로 본다.
+    """
+    tri = triage.classify(text)
+    by_keyword = keyword_emergency(text)
+    by_model = bool(tri and tri["label"] == "응급")
+    return {"emergency": by_keyword or by_model, "keyword": by_keyword, "model": by_model, "triage": tri}
+
+
+def is_emergency(text: str) -> bool:
+    return safety_check(text)["emergency"]
 
 
 # ---------- 2) 안내문 (지식 베이스) ----------
@@ -124,11 +141,12 @@ def run_agent(messages: list[dict], impl: dict) -> dict:
     question = messages[-1]["content"]
 
     # 안전장치가 LLM보다 먼저
-    if is_emergency(question):
-        return {"reply": EMERGENCY_REPLY, "tools_used": [], "mode": "safety"}
+    safety = safety_check(question)
+    if safety["emergency"]:
+        return {"reply": EMERGENCY_REPLY, "tools_used": [], "mode": "safety", "safety": safety}
 
     if LLM_PROVIDER == "ollama":
-        return run_ollama(messages, impl)
+        return run_ollama(messages, impl, safety)
     if LLM_PROVIDER != "anthropic" or anthropic is None or not os.getenv("ANTHROPIC_API_KEY"):
         return demo_answer(question, impl)
 
@@ -269,8 +287,11 @@ def local_messages(messages: list[dict], impl: dict) -> tuple[list[dict], list[s
     return convo, used
 
 
-def run_ollama(messages: list[dict], impl: dict) -> dict:
+def run_ollama(messages: list[dict], impl: dict, safety: dict | None = None) -> dict:
     question = messages[-1]["content"]
+    talk = small_talk(question, safety or safety_check(question), impl)    # DL 분류 '일반' → 바로 답
+    if talk:
+        return talk
     topic = guide_direct(question)
     if topic:
         return {"reply": GUIDE[topic], "tools_used": ["search_guide"], "mode": "guide"}
@@ -305,20 +326,26 @@ def run_ollama(messages: list[dict], impl: dict) -> dict:
 
 def _whole(answer: dict):
     """미리 완성된 답(안전 안내, 안내문, 내 기록, 데모)을 스트리밍 형식으로 보낸다."""
-    yield {"type": "meta", "mode": answer["mode"], "tools_used": answer["tools_used"]}
+    yield {"type": "meta", "mode": answer["mode"], "tools_used": answer["tools_used"],
+           "safety": answer.get("safety")}
     yield {"type": "delta", "text": answer["reply"]}
     yield {"type": "done"}
 
 
 def run_agent_stream(messages: list[dict], impl: dict):
     question = messages[-1]["content"]
-    if is_emergency(question):                                   # 안전장치는 항상 먼저
-        yield from _whole({"reply": EMERGENCY_REPLY, "tools_used": [], "mode": "safety"})
+    safety = safety_check(question)                              # 안전장치는 항상 먼저
+    if safety["emergency"]:
+        yield from _whole({"reply": EMERGENCY_REPLY, "tools_used": [], "mode": "safety", "safety": safety})
         return
     if LLM_PROVIDER != "ollama":                                 # Claude API·데모는 한 번에 보낸다
         yield from _whole(run_agent(messages, impl))
         return
 
+    talk = small_talk(question, safety, impl)                    # DL 분류 '일반' → 바로 답
+    if talk:
+        yield from _whole(talk)
+        return
     topic = guide_direct(question)
     if topic:
         yield from _whole({"reply": GUIDE[topic], "tools_used": ["search_guide"], "mode": "guide"})
@@ -362,6 +389,31 @@ def run_agent_stream(messages: list[dict], impl: dict):
 
 
 # ---------- 5) 데모 모드: API 키가 없을 때의 간단한 규칙 답변 ----------
+
+def small_talk(question: str, safety: dict, impl: dict) -> dict | None:
+    """
+    딥러닝 분류가 '일반'(인사·감사·근황)으로 본 문장은 AI 없이 바로 답한다.
+    이번 주 기록이 없으면 기록을 함께 권한다.
+    """
+    tri = safety.get("triage")
+    if not tri or tri["label"] != "일반" or tri["probs"]["일반"] < 0.7:
+        return None
+    q = question.replace(" ", "")
+    if any(w in q for w in ["고마", "감사"]):
+        reply = "천만에요. 궁금한 점이 생기면 언제든 물어보세요."
+    elif any(w in q for w in ["안녕", "반가"]):
+        reply = "안녕하세요! 기록과 일정, 기증 후 생활에 대해 물어보세요."
+    elif any(w in q for w in ["기록", "입력", "적었", "쟀"]):
+        reply = "기록해 주셔서 고마워요. 꾸준한 기록이 추적관리에 큰 도움이 돼요. 첫 화면의 '이번 주 기록' 카드에서 저장됐는지 확인해 보세요."
+    elif any(w in q for w in ["산책", "운동", "걷", "등산", "수영"]):
+        reply = "다녀오셨군요! 무리하지 않는 규칙적인 운동은 기증 후 건강 관리에 도움이 돼요."
+    else:
+        reply = "알려 주셔서 고마워요. 궁금한 점이 있으면 편하게 물어보세요."
+    said_recorded = any(w in q for w in ["기록", "입력", "적었", "쟀"])
+    if not said_recorded and any("이번 주" in n["title"] and "기록" in n["title"] for n in impl["get_notifications"]()):
+        reply += " 참, 이번 주 혈압 기록이 아직 없어요. 첫 화면의 '기록하기'로 남겨 주세요."
+    return {"reply": reply, "tools_used": ["triage", "get_notifications"], "mode": "chat"}
+
 
 def record_answer(question: str, impl: dict) -> dict | None:
     """

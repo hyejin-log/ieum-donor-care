@@ -1,0 +1,28 @@
+{
+ "name": "공여자 문장 분류 (EmbeddingBag + MLP, PyTorch)",
+ "trained_on": "합성 문장 (triage_sentences.csv) · 임상 검증 전 시연용",
+ "labels": [
+  "일반",
+  "문의",
+  "응급"
+ ],
+ "buckets": 4096,
+ "emergency_threshold": 0.35,
+ "group_cv": {
+  "일반": {
+   "precision": 0.673,
+   "recall": 0.767,
+   "f1-score": 0.717
+  },
+  "문의": {
+   "precision": 0.812,
+   "recall": 0.872,
+   "f1-score": 0.841
+  },
+  "응급": {
+   "precision": 0.872,
+   "recall": 0.718,
+   "f1-score": 0.788
+  }
+ }
+}

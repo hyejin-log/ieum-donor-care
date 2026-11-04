@@ -489,7 +489,7 @@ $("form").addEventListener("submit", async (e) => {
 
 // ---------- 안내 Agent ----------
 let chat = [];                                   // [{role, content}] 이번 대화 기록 (화면을 닫으면 유지, 공여자 바꾸면 초기화)
-const MODE_LABEL = { llm: "AI 답변 · 내 기록 기준", demo: "데모 모드", safety: "안전 안내", guarded: "기록 기준 안내", guide: "이식센터 안내문", record: "내 기록에서 바로 확인" };
+const MODE_LABEL = { llm: "AI 답변 · 내 기록 기준", demo: "데모 모드", safety: "안전 안내", guarded: "기록 기준 안내", guide: "이식센터 안내문", record: "내 기록에서 바로 확인", chat: "일반 대화 · 문장 분류 모델" };
 const escapeHtml = (t) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 function addMsg(role, text, mode) {
@@ -562,7 +562,9 @@ function openChat() {
   fetch(`/donors/${encodeURIComponent(code())}/chat/warmup`, { method: "POST" }).catch(() => {});   // 내 자료를 모델에 미리 읽혀 두기 (기다리지 않음)
 }
 
-$("donorCode").addEventListener("change", () => { chat = []; $("chatLog").innerHTML = ""; });
+const warmUp = () => fetch(`/donors/${encodeURIComponent(code())}/chat/warmup`, { method: "POST" }).catch(() => {});
+warmUp();                                         // 화면을 열자마자 AI 모델을 미리 준비 (기다리지 않음)
+$("donorCode").addEventListener("change", () => { chat = []; $("chatLog").innerHTML = ""; warmUp(); });
 $("donorCode").addEventListener("change", loadAll);
 updateNotifyAsk();
 loadAll();
