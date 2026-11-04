@@ -3,8 +3,9 @@
 공여자의 질문에 답하는 LLM Agent. Claude API의 도구 사용(tool use)으로
 공여자 본인의 기록을 조회하고, 안내문을 찾아 답한다.
 
-- LLM은 두 가지 중 하나를 쓴다 (.env 의 LLM_PROVIDER)
+- LLM은 다음 중 하나를 쓴다 (.env 의 LLM_PROVIDER)
     ollama    : 내 컴퓨터에서 도는 무료 모델 (기본값). 기록이 외부로 나가지 않는다.
+    groq      : Groq 클라우드 (무료 등급, 매우 빠름, GROQ_API_KEY 필요). 자료가 외부로 전송된다.
     anthropic : Claude API (유료, ANTHROPIC_API_KEY 필요)
 - LLM에 연결할 수 없으면 '데모 모드'로 간단한 규칙 답변을 한다.
 - 응급 증상 단어가 들어오면 LLM을 부르지 않고 바로 응급 안내를 한다.
@@ -12,6 +13,10 @@
 """
 import json
 import os
+
+from dotenv import load_dotenv
+
+load_dotenv(override=True)   # main.py보다 먼저 import되므로 여기서도 .env를 읽는다 (.env 값이 항상 우선)
 import urllib.error
 import urllib.request
 
@@ -22,11 +27,14 @@ try:
 except ImportError:          # 패키지가 없으면 데모 모드로만 동작
     anthropic = None
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")          # ollama | anthropic | demo
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").strip().strip('"\'').lower()   # 공백·따옴표·대문자 허용          # ollama | groq | anthropic | demo
 MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 OLLAMA_TIMEOUT = 120                                         # 내 컴퓨터(CPU)에서는 답이 느릴 수 있다
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"  # OpenAI와 같은 형식의 API
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+MAX_ANSWER_TOKENS = 220
 MAX_TOOL_ROUNDS = 5          # 도구 호출 → 답변 반복의 최대 횟수
 MAX_TOKENS = 700
 
@@ -145,7 +153,7 @@ def run_agent(messages: list[dict], impl: dict) -> dict:
     if safety["emergency"]:
         return {"reply": EMERGENCY_REPLY, "tools_used": [], "mode": "safety", "safety": safety}
 
-    if LLM_PROVIDER == "ollama":
+    if LLM_PROVIDER in ("ollama", "groq"):
         return run_ollama(messages, impl, safety)
     if LLM_PROVIDER != "anthropic" or anthropic is None or not os.getenv("ANTHROPIC_API_KEY"):
         return demo_answer(question, impl)
@@ -205,6 +213,8 @@ LOCAL_SYSTEM = """너는 신장 기증자 앱 '이음'의 안내 도우미다. �
 - 기증 후 몸 상태, 생활, 검사, 기록에 관한 질문은 모두 답한다. 그 밖의 주제만 "죄송해요, 이음 안내는 기증 후 관리와 앱 사용에 대해서만 답할 수 있어요."라고 답한다.
 - 한국어 존댓말로 3~4문장."""
 
+GUARDED_REPLY = ("이 질문은 제가 기록만으로 판단하기 어려워요. 담당 의료진이나 이식센터 코디네이터에게 확인해 주세요. "
+                 "다음 검사 일정, 최근 혈압, 검사 결과는 저에게 물어보시면 바로 알려 드려요.")
 BANNED = ["정상 범위", "정상입니다", "정상이에요", "괜찮아 보", "문제없", "문제 없", "건강하십니다"]
 
 
@@ -238,14 +248,19 @@ def build_context(question: str, impl: dict) -> tuple[dict, list[str]]:
         next_text = "예정된 추적검사 없음"
     else:
         state = {"missed": "아직 받지 않음(기간 지남)", "window": "지금 검사 기간", "upcoming": "예정"}[nxt["status"]]
-        next_text = f"{nxt['visit_name']} · 예정일 {nxt['due_date']} · {state}"
+        from datetime import timedelta
+        end = nxt["due_date"] + timedelta(days=60)
+        next_text = (f"{nxt['visit_name']} · 예정일 {nxt['due_date']} · {state}"
+                     + (f" (검사 기간 마감 {end}, 아직 받지 않음)" if nxt["status"] == "window" else ""))
     ctx = {
         "기증 후 일수": s["days_since_donation"],
         "다음 추적검사": next_text,
         "최근 혈압": [f"{r['measured_at']} {r['systolic_bp']}/{r['diastolic_bp']}" for r in home[-2:]],
         "최근 체중": (f"{home[-1]['measured_at']} {home[-1]['weight_kg']}kg" if home else "없음"),
-        "최근 병원 검사": (f"{labs[-1]['tested_at']} eGFR {labs[-1]['egfr']}(기증 전의 {s['egfr_percent_of_predonation']}%), "
-                       f"소변 단백 {labs[-1]['urine_protein']}" if labs else "없음"),
+        "최근 병원 검사": (f"{labs[-1]['tested_at']} 검사: eGFR {labs[-1]['egfr']} "
+                       f"(기증 전 eGFR {s['predonation_egfr']}의 {s['egfr_percent_of_predonation']}% 수준), "
+                       f"소변 단백 {({'Negative': '음성', 'Trace': '미량'}).get(labs[-1]['urine_protein'], labs[-1]['urine_protein'])}"
+                       if labs else "없음"),
         "지금 알림": [n["title"] for n in impl["get_notifications"]()],
     }
     hits = {k: v for k, v in GUIDE.items() if k.replace(" ", "") in question.replace(" ", "")}
@@ -269,6 +284,118 @@ def warm_up(impl: dict | None = None) -> bool:
         return True
     except Exception:
         return False
+
+
+class LLMError(Exception):
+    """AI 서버에 연결하지 못했거나 한도를 넘었을 때"""
+
+
+LAST_LLM_ERROR = None        # 가장 최근의 AI 연결 오류 (/health 에서 확인용, 키 값은 담지 않는다)
+
+
+def _fail(reason: str):
+    global LAST_LLM_ERROR
+    LAST_LLM_ERROR = reason
+    print(f"[agent] AI 연결 실패: {reason}")                   # 서버 터미널에도 남긴다
+    return LLMError(reason)
+
+
+GROQ_PREFERRED = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "qwen/qwen3-32b",
+                  "openai/gpt-oss-20b", "llama-3.1-8b-instant"]
+
+
+def groq_models() -> list[str]:
+    """이 키로 쓸 수 있는 Groq 모델 이름 목록"""
+    key = (os.getenv("GROQ_API_KEY") or "").strip().strip('"\'').strip()
+    req = urllib.request.Request("https://api.groq.com/openai/v1/models",
+                                 headers={"Authorization": f"Bearer {key}", "User-Agent": "ieum-donor-care/1.0"})
+    with urllib.request.urlopen(req, timeout=15) as res:
+        return sorted(m["id"] for m in json.loads(res.read())["data"])
+
+
+def pick_groq_model() -> str | None:
+    """설정한 모델이 없어졌을 때, 쓸 수 있는 모델 중 선호 순서대로 하나를 고른다."""
+    try:
+        available = groq_models()
+    except Exception:
+        return None
+    for name in GROQ_PREFERRED:
+        if name in available:
+            return name
+    chat = [m for m in available if not any(w in m for w in ["whisper", "tts", "guard", "embed"])]
+    return chat[0] if chat else None
+
+
+def llm_stream(convo: list[dict]):
+    """모델이 사라졌다는 오류(404)가 나면, 쓸 수 있는 모델로 바꿔 한 번 더 시도한다."""
+    global GROQ_MODEL
+    try:
+        yield from _llm_stream(convo)
+    except LLMError as e:
+        if LLM_PROVIDER == "groq" and "model_not_found" in str(e):
+            new = pick_groq_model()
+            if new and new != GROQ_MODEL:
+                print(f"[agent] Groq 모델 {GROQ_MODEL} → {new} 로 변경")
+                GROQ_MODEL = new
+                yield from _llm_stream(convo)
+                return
+        raise
+
+
+def _llm_stream(convo: list[dict]):
+    """
+    지정된 LLM(ollama 또는 groq)에 대화를 보내고, 답의 글자 조각을 생기는 대로 하나씩 돌려준다.
+    두 서비스 모두 한 줄에 조각 하나씩 보내지만 형식이 조금 다르다.
+    """
+    if LLM_PROVIDER == "groq":
+        key = (os.getenv("GROQ_API_KEY") or "").strip().strip('"\'').strip()   # 따옴표·공백이 섞여도 동작
+        if not key:
+            raise _fail("GROQ_API_KEY 없음")
+        body = {"model": GROQ_MODEL, "messages": convo, "stream": True,
+                "temperature": 0.1, "max_tokens": MAX_ANSWER_TOKENS}
+        if GROQ_MODEL.startswith("openai/gpt-oss"):
+            # 생각(추론)을 먼저 하는 모델: 생각은 짧게, 화면에는 답만 보내게 하고 토큰 여유를 더 준다
+            body.update({"reasoning_effort": "low", "include_reasoning": False, "max_tokens": 1000})
+        req = urllib.request.Request(GROQ_URL, data=json.dumps(body).encode("utf-8"), headers={
+            "Content-Type": "application/json", "Authorization": f"Bearer {key}",
+            "User-Agent": "ieum-donor-care/1.0"})            # 기본 User-Agent는 차단될 수 있다
+        timeout = 30
+    else:
+        body = {"model": OLLAMA_MODEL, "messages": convo, "stream": True, "keep_alive": "30m",
+                "options": {"temperature": 0.1, "num_predict": MAX_ANSWER_TOKENS, "num_ctx": 2048}}
+        req = urllib.request.Request(f"{OLLAMA_URL}/api/chat", data=json.dumps(body).encode("utf-8"),
+                                     headers={"Content-Type": "application/json"})
+        timeout = OLLAMA_TIMEOUT
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as res:
+            for raw in res:
+                line = raw.decode("utf-8").strip()
+                if not line:
+                    continue
+                if LLM_PROVIDER == "groq":                       # 형식: data: {...}  /  data: [DONE]
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    piece = json.loads(data)["choices"][0]["delta"].get("content") or ""
+                else:                                            # 형식: {"message": {"content": ...}, "done": ...}
+                    chunk = json.loads(line)
+                    piece = chunk.get("message", {}).get("content", "")
+                    if chunk.get("done"):
+                        if piece:
+                            yield piece
+                        break
+                if piece:
+                    yield piece
+    except urllib.error.HTTPError as e:                          # 401 키 오류, 429 한도 초과 등
+        try:
+            detail = e.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            detail = ""
+        raise _fail(f"HTTP {e.code} {detail}") from e
+    except (urllib.error.URLError, TimeoutError, ConnectionError, json.JSONDecodeError, KeyError) as e:
+        raise _fail(f"{type(e).__name__}: {e}"[:300]) from e
 
 
 def local_messages(messages: list[dict], impl: dict) -> tuple[list[dict], list[str]]:
@@ -300,20 +427,15 @@ def run_ollama(messages: list[dict], impl: dict, safety: dict | None = None) -> 
         return rec
     convo, used = local_messages(messages, impl)
     try:
-        resp = ollama_chat({"model": OLLAMA_MODEL, "messages": convo, "stream": False,
-                            "keep_alive": "30m",                       # 모델을 30분간 메모리에 유지
-                            "options": {"temperature": 0.1, "num_predict": 220, "num_ctx": 2048}})
-        text = (resp.get("message", {}).get("content") or "").strip()
-    except (urllib.error.URLError, TimeoutError, ConnectionError, json.JSONDecodeError) as e:
+        text = "".join(llm_stream(convo)).strip()
+    except LLMError:
         fallback = demo_answer(question, impl)
         fallback["reply"] = "(AI 모델에 연결하지 못해 데모 답변을 보여 드려요) " + fallback["reply"]
         return fallback
 
     # 출력 검사: 비어 있거나, 수치를 정상이라고 판단하면 규칙 답변으로 바꾼다
     if not text or any(b in text for b in BANNED):
-        fallback = demo_answer(question, impl)
-        fallback["mode"] = "guarded"
-        return fallback
+        return {"reply": GUARDED_REPLY, "tools_used": used, "mode": "guarded"}
     return {"reply": text, "tools_used": used, "mode": "llm"}
 
 
@@ -338,7 +460,7 @@ def run_agent_stream(messages: list[dict], impl: dict):
     if safety["emergency"]:
         yield from _whole({"reply": EMERGENCY_REPLY, "tools_used": [], "mode": "safety", "safety": safety})
         return
-    if LLM_PROVIDER != "ollama":                                 # Claude API·데모는 한 번에 보낸다
+    if LLM_PROVIDER not in ("ollama", "groq"):                   # Claude API·데모는 한 번에 보낸다
         yield from _whole(run_agent(messages, impl))
         return
 
@@ -356,25 +478,13 @@ def run_agent_stream(messages: list[dict], impl: dict):
         return
 
     convo, used = local_messages(messages, impl)
-    payload = {"model": OLLAMA_MODEL, "messages": convo, "stream": True, "keep_alive": "30m",
-               "options": {"temperature": 0.1, "num_predict": 220, "num_ctx": 2048}}
-    req = urllib.request.Request(f"{OLLAMA_URL}/api/chat", data=json.dumps(payload).encode("utf-8"),
-                                 headers={"Content-Type": "application/json"})
     text = ""
+    yield {"type": "meta", "mode": "llm", "tools_used": used}
     try:
-        with urllib.request.urlopen(req, timeout=OLLAMA_TIMEOUT) as res:
-            yield {"type": "meta", "mode": "llm", "tools_used": used}
-            for line in res:                                     # Ollama도 한 줄에 조각 하나씩 보낸다
-                if not line.strip():
-                    continue
-                chunk = json.loads(line)
-                piece = chunk.get("message", {}).get("content", "")
-                if piece:
-                    text += piece
-                    yield {"type": "delta", "text": piece}
-                if chunk.get("done"):
-                    break
-    except (urllib.error.URLError, TimeoutError, ConnectionError, json.JSONDecodeError):
+        for piece in llm_stream(convo):
+            text += piece
+            yield {"type": "delta", "text": piece}
+    except LLMError:
         fb = demo_answer(question, impl)
         yield {"type": "replace", "mode": fb["mode"],
                "text": "(AI 모델에 연결하지 못해 데모 답변을 보여 드려요) " + fb["reply"]}
@@ -383,8 +493,7 @@ def run_agent_stream(messages: list[dict], impl: dict):
 
     # 출력 검사는 다 만든 뒤에 한다. 걸리면 화면의 답을 정해진 답으로 바꾼다.
     if not text.strip() or any(b in text for b in BANNED):
-        fb = demo_answer(question, impl)
-        yield {"type": "replace", "mode": "guarded", "text": fb["reply"]}
+        yield {"type": "replace", "mode": "guarded", "text": GUARDED_REPLY}
     yield {"type": "done"}
 
 

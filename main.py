@@ -184,10 +184,32 @@ def dashboard_page():
     return FileResponse("static/dashboard.html")
 
 
+def _key_check(key: str | None) -> dict | None:
+    """키 값 대신 모양만 확인한다: Groq 키는 gsk_ 로 시작한다."""
+    if not key:
+        return None
+    k = key.strip().strip('"\'').strip()
+    return {"length": len(k), "starts_with_gsk_": k.startswith("gsk_"),
+            "has_space_or_quote": any(c in k for c in " '\"<>")}
+
+
 @app.get("/health")
 def health():
     """서버가 살아 있는지 확인"""
-    return {"status": "ok"}
+    return {"status": "ok", "llm_provider": agent.LLM_PROVIDER,
+            "llm_model": agent.GROQ_MODEL if agent.LLM_PROVIDER == "groq" else agent.OLLAMA_MODEL,
+            "groq_key_set": bool(os.getenv("GROQ_API_KEY")),          # 키 값은 보여주지 않는다
+            "groq_key_check": _key_check(os.getenv("GROQ_API_KEY")),
+            "llm_last_error": agent.LAST_LLM_ERROR}
+
+
+@app.get("/health/groq-models")
+def groq_model_list():
+    """이 키로 쓸 수 있는 Groq 모델 목록 (모델 이름만)"""
+    try:
+        return {"current": agent.GROQ_MODEL, "available": agent.groq_models()}
+    except Exception as e:
+        return {"current": agent.GROQ_MODEL, "error": type(e).__name__}
 
 
 # ---------- 공여자·추적검사 ----------
