@@ -420,7 +420,7 @@ def weekly_records(conn, today: date, weeks: int = RECENT_WEEKS) -> pd.DataFrame
 
 
 def build_research_tables(conn, today: date) -> dict[str, pd.DataFrame]:
-    """공여자 요약 · 검사 결과 · 자가 기록 · 추적검사 표 4개를 만든다."""
+    """공여자 요약 · 검사 결과 · 자가 기록 · 주간 기록 · 추적검사 표 5개를 만든다."""
     donors = query_df(conn,
         "SELECT donor_id, donor_code, birth_year, sex, donation_date, predonation_egfr "
         "FROM donors ORDER BY donor_code",
@@ -509,7 +509,7 @@ def build_research_tables(conn, today: date) -> dict[str, pd.DataFrame]:
 
 @app.get("/export/research.xlsx")
 def export_research():
-    """연구 데이터를 엑셀 파일 하나(시트 4개)로 내려받는다. 의료진용."""
+    """연구 데이터를 엑셀 파일 하나(시트 5개)로 내려받는다. 의료진용."""
     today = date.today()
     with get_conn() as conn:
         tables = build_research_tables(conn, today)
