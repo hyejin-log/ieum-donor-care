@@ -203,6 +203,17 @@ def prepare_database():
     """
     try:
         with get_conn() as conn:
+            # 이미 준비된 DB면 질의 1번으로 끝낸다 (서버리스는 서버가 새로 뜰 때마다 이 함수를 부른다)
+            ready = conn.execute(
+                "SELECT to_regclass('public.consult_requests') IS NOT NULL AS t, "
+                "(SELECT count(*) FROM pg_tables WHERE tablename = 'users') AS u").fetchone()
+            if ready["t"] and ready["u"]:
+                if not (demo_reset_on() and os.getenv("DEMO_PASSWORD")):
+                    return
+                names = [a[0] for a in DEMO_ACCOUNTS]
+                n = conn.execute("SELECT count(*) AS n FROM users WHERE username = ANY(%s)", (names,)).fetchone()["n"]
+                if n == len(names):
+                    return
             conn.execute((BASE_DIR / "db" / "schema_all.sql").read_text(encoding="utf-8"))
             conn.execute(auth.AUTH_SQL)
             conn.execute(CARE_SQL)
