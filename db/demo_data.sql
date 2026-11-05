@@ -6,12 +6,14 @@
 
 TRUNCATE chat_messages, consult_requests, lab_results, home_measurements, followups RESTART IDENTITY;
 
-INSERT INTO donors (donor_code, birth_year, sex, donation_date, predonation_egfr) VALUES
-    ('D-001', 1968, 'F', current_date - interval '17 months', 135),
-    ('D-002', 1972, 'M', current_date - interval '7 months', 118),
-    ('D-003', 1988, 'F', current_date - interval '26 months', 102)
+-- donated_side: 기증한 쪽 신장 (L 왼쪽 · R 오른쪽). 생체 기증은 왼쪽이 더 흔하다.
+INSERT INTO donors (donor_code, birth_year, sex, donation_date, predonation_egfr, donated_side) VALUES
+    ('D-001', 1968, 'F', current_date - interval '17 months', 135, 'L'),
+    ('D-002', 1972, 'M', current_date - interval '7 months', 118, 'L'),
+    ('D-003', 1988, 'F', current_date - interval '26 months', 102, 'R')
 ON CONFLICT (donor_code) DO UPDATE SET birth_year = EXCLUDED.birth_year, sex = EXCLUDED.sex,
-    donation_date = EXCLUDED.donation_date, predonation_egfr = EXCLUDED.predonation_egfr;
+    donation_date = EXCLUDED.donation_date, predonation_egfr = EXCLUDED.predonation_egfr,
+    donated_side = EXCLUDED.donated_side;
 
 -- 추적검사 일정: 6개월 · 1년 · 2년 · 3년
 INSERT INTO followups (donor_id, visit_name, due_date)

@@ -158,7 +158,7 @@ def get_conn():
 def get_donor(conn, donor_code: str) -> dict:
     """공여자 코드로 공여자를 찾는다. 없으면 404."""
     donor = conn.execute(
-        "SELECT donor_id, donor_code, sex, donation_date, predonation_egfr FROM donors WHERE donor_code = %s",
+        "SELECT donor_id, donor_code, sex, donation_date, predonation_egfr, donated_side FROM donors WHERE donor_code = %s",
         (donor_code,),
     ).fetchone()
     if donor is None:
@@ -196,6 +196,8 @@ CREATE TABLE IF NOT EXISTS consult_requests (
 ALTER TABLE consult_requests ADD COLUMN IF NOT EXISTS callback_at TIMESTAMPTZ;
 CREATE UNIQUE INDEX IF NOT EXISTS consult_requests_slot ON consult_requests (callback_at)
     WHERE status = 'new' AND callback_at IS NOT NULL;
+-- 기증한 쪽 신장 (L 왼쪽 / R 오른쪽, 모르면 비움). 의료진이 기록한다.
+ALTER TABLE donors ADD COLUMN IF NOT EXISTS donated_side TEXT CHECK (donated_side IN ('L', 'R'));
 """
 
 
@@ -243,9 +245,11 @@ def prepare_database():
         with get_conn() as conn:
             # 이미 준비된 DB면 질의 1번으로 끝낸다 (서버리스는 서버가 새로 뜰 때마다 이 함수를 부른다)
             ready = conn.execute(
-                "SELECT to_regclass('public.consult_requests_slot') IS NOT NULL AS t, "
+                "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = 'donors' AND column_name = 'donated_side') "
+                "AND to_regclass('public.consult_requests_slot') IS NOT NULL AS t, "
                 "(SELECT count(*) FROM pg_tables WHERE tablename = 'users') AS u").fetchone()
-            if ready["t"] and ready["u"]:                # 마지막에 추가한 것(전화 예약 색인)까지 있으면 준비된 DB
+            if ready["t"] and ready["u"]:                # 마지막에 추가한 것(기증한 쪽 칸)까지 있으면 준비된 DB
                 if not (demo_reset_on() and os.getenv("DEMO_PASSWORD")):
                     return
                 names = [a[0] for a in DEMO_ACCOUNTS]
@@ -624,6 +628,7 @@ def donor_summary(donor_code: str):
     return {
         "donor_code": donor["donor_code"],
         "sex": donor["sex"],
+        "donated_side": donor["donated_side"],
         "donation_date": donor["donation_date"],
         "days_since_donation": (today - donor["donation_date"]).days,
         "predonation_egfr": donor["predonation_egfr"],
@@ -632,6 +637,19 @@ def donor_summary(donor_code: str):
         "egfr_percent_of_predonation": percent,
         "visits": visits,
     }
+
+
+class SideIn(BaseModel):
+    side: Literal["L", "R"] | None = None
+
+
+@app.put("/donors/{donor_code}/donated-side", dependencies=[Depends(staff_only)])
+def set_donated_side(donor_code: str, body: SideIn):
+    """의료진: 기증한 쪽 신장을 기록한다 (수술 기록 기준). None 이면 지운다."""
+    with get_conn() as conn:
+        donor = get_donor(conn, donor_code)
+        conn.execute("UPDATE donors SET donated_side = %s WHERE donor_id = %s", (body.side, donor["donor_id"]))
+    return {"donor_code": donor_code, "donated_side": body.side}
 
 
 @app.get("/guide/reference")

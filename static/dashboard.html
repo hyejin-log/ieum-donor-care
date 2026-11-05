@@ -70,13 +70,28 @@
     .hero { grid-area: hero; } .egfr { grid-area: egfr; } .bp { grid-area: bp; } .side { grid-area: side; }
 
     /* 히어로: 신장 그림 */
-    .hero { display: flex; flex-direction: column; position: relative; overflow: hidden;
-            background: radial-gradient(120% 90% at 70% 40%, #14306E 0%, #0B1A40 55%, #070F27 100%); color: #DCE8FF; }
-    .hero .card-title { color: #fff; }
-    .hero .chip.blue { background: rgba(95, 212, 255, .12); color: #8FE0FF; }
-    .hero .tile { background: rgba(255, 255, 255, .05); border: 1px solid rgba(143, 224, 255, .14); }
+    .hero { display: flex; flex-direction: column; justify-content: center; gap: clamp(14px, 4vh, 36px); position: relative; overflow: hidden;
+            background: linear-gradient(135deg, #2F5BD0 0%, #5A86EE 100%); color: #fff; }
+    .hero .label { color: rgba(255, 255, 255, .78); }
+    .next-main .dday { font-size: clamp(2.6rem, 8vh, 4.2rem); font-weight: 800; line-height: 1.05; margin: 6px 0 4px; letter-spacing: -.01em; }
+    .next-main .sub { font-size: .95rem; color: rgba(255, 255, 255, .85); }
+    .next-main .flag { margin-top: 12px; background: rgba(255, 255, 255, .16); border-radius: 12px; padding: 9px 12px; font-size: .85rem; display: flex; gap: 8px; align-items: center; }
+    .next-main .flag::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #FFC2B2; flex: none; }
+    .next-main .flag.amber::before { background: #FFE19C; }
+    .next-main .flag:empty { display: none; }
+    .hero .tile { background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .2); }
     .hero .tile .num { color: #fff; }
-    .hero .tile .num small, .hero .tile .sub, .hero .label { color: rgba(220, 232, 255, .6); }
+    .hero .tile .num small, .hero .tile .sub { color: rgba(255, 255, 255, .75); }
+    /* 신장 그림 카드 (사이드 위) */
+    .kidney-card { display: flex; flex-direction: column; overflow: hidden; padding-bottom: .8rem;
+                   background: radial-gradient(120% 90% at 70% 40%, #14306E 0%, #0B1A40 55%, #070F27 100%); color: #DCE8FF; }
+    .kidney-card .card-title { color: #fff; }
+    .kidney-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .side-seg { display: flex; align-items: center; gap: 4px; font-size: .7rem; color: rgba(220, 232, 255, .65); }
+    .side-seg button { margin: 0; width: auto; padding: 3px 9px; font-size: .72rem; border-radius: 999px; font-weight: 700;
+                       background: rgba(255, 255, 255, .06); color: #BFD3FF; border: 1px solid rgba(143, 224, 255, .25); }
+    .side-seg button.on { background: #8FE0FF; color: #0B1A40; border-color: #8FE0FF; }
+    .kidney-cap { margin: 2px 0 0; font-size: .7rem; color: rgba(220, 232, 255, .6); text-align: center; }
     @keyframes flow { to { stroke-dashoffset: -400; } }
     .orbit { animation: flow 14s linear infinite; }
     .orbit.rev { animation-direction: reverse; animation-duration: 18s; }
@@ -89,8 +104,8 @@
     .hero-top { display: flex; justify-content: space-between; align-items: center; }
     .chip { display: inline-flex; align-items: center; gap: 6px; font-size: .74rem; font-weight: 600; padding: 5px 12px; border-radius: 999px; background: var(--soft); color: var(--ink); }
     .chip.blue { background: var(--blue-soft); color: var(--blue); }
-    .kidney-stage { flex: 1; min-height: 220px; display: grid; place-items: center; position: relative; }
-    .kidney-stage svg { width: 100%; height: 100%; max-height: 360px; }
+    .kidney-stage { height: clamp(150px, 26vh, 240px); display: grid; place-items: center; position: relative; }
+    .kidney-stage svg { width: 100%; height: 100%; }
     .hero-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .tile { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 12px 16px; min-width: 0; }
     .tile .num { font-size: clamp(1.4rem, 3.4vh, 1.9rem); font-weight: 800; color: var(--navy); line-height: 1.2; font-variant-numeric: tabular-nums; }
@@ -139,6 +154,25 @@
     .window .status { background: var(--amber-soft); color: var(--amber); }
     .upcoming .status { background: var(--card); color: var(--muted); }
 
+    /* '왜 중요해요?' 설명 */
+    .why { margin: 0; width: auto; padding: 2px 9px; font-size: .7rem; font-weight: 700; border-radius: 999px; line-height: 1.6;
+           background: var(--blue-soft); color: var(--blue); border: none; vertical-align: middle; }
+    .hero .why { background: rgba(255, 255, 255, .2); color: #fff; }
+    .key { font-size: .76rem; color: var(--ink); background: var(--soft); border-radius: 12px; padding: 7px 10px; margin: 8px 0 0; line-height: 1.45; }
+    .key b { color: var(--navy); }
+    .hero .key { background: rgba(255, 255, 255, .14); color: #fff; }
+    .hero .key b { color: #fff; }
+    .card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    #explainDialog article { max-width: 560px; }
+    #explainBody h4 { font-size: 1rem; margin: 16px 0 6px; color: var(--navy); }
+    #explainBody h4:first-child { margin-top: 0; }
+    #explainBody p, #explainBody li { font-size: .92rem; line-height: 1.6; color: var(--ink); }
+    #explainBody ul { padding-left: 1.2em; margin: 0 0 8px; }
+    #explainBody .visit { background: var(--soft); border-radius: 14px; padding: 10px 14px; margin: 0 0 8px; }
+    #explainBody .visit b { display: block; color: var(--navy); margin-bottom: 2px; }
+    #explainBody .visit.missed { background: var(--warn-soft); }
+    #explainBody .visit.done { background: var(--ok-soft); }
+    #explainBody .src { font-size: .76rem; color: var(--muted); margin-top: 12px; }
     table { font-size: .88rem; margin-bottom: 0; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
     #msg.ok { color: var(--ok); }
@@ -161,9 +195,7 @@
       .chart-box { min-height: 0; }
       .visit-list { justify-content: flex-start; }
       .visit-list li { padding: clamp(5px, .9vh, 8px) 10px; }
-      .next { padding-top: clamp(.7rem, 1.6vh, 1.1rem); padding-bottom: clamp(.7rem, 1.6vh, 1.1rem); }
-      .next .dday { font-size: clamp(1.7rem, 4.2vh, 2.6rem); }
-      .next .flag { margin-top: clamp(6px, 1.2vh, 12px); }
+      .kidney-stage { height: clamp(120px, 24vh, 240px); }
     }
     @media (max-width: 700px) {
       .who, #todayStatus { display: none; }
@@ -195,11 +227,66 @@
 
   <div class="grid">
 
-    <!-- 히어로: 나의 신장 -->
+    <!-- 히어로: 가장 중요한 것 (다음 추적검사 · 기증 후 일수 · 최근 혈압) -->
     <article class="hero">
-      <div class="hero-top">
-        <span class="card-title">나의 신장</span>
+      <div class="next-main">
+        <div class="label card-head">다음 추적검사 <button class="why" data-why="missed">검사를 놓치면?</button></div>
+        <div class="dday" id="statVisit">-</div>
+        <div class="sub" id="statVisitSub"></div>
+        <div class="flag" id="statVisitFlag"></div>
       </div>
+      <div class="hero-stats">
+        <div class="tile">
+          <div class="label card-head">기증 후 <button class="why" data-why="days">왜 중요해요?</button></div>
+          <div class="num" id="statDays">-</div>
+          <div class="sub" id="statDaysSub"></div>
+        </div>
+        <div class="tile">
+          <div class="label card-head">최근 혈압 <button class="why" data-why="bp">왜 중요해요?</button></div>
+          <div class="num" id="statBp">-</div>
+          <div class="sub" id="statBpSub"></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- eGFR -->
+    <article class="egfr chart-card">
+      <div class="chart-top">
+        <div>
+          <div class="card-title card-head">나의 기준값 · eGFR <button class="why" data-why="egfr">무엇을 봐야 해요?</button></div>
+          <div class="meta" id="percentSub"></div>
+        </div>
+        <svg class="ring" viewBox="0 0 84 84" id="ring"></svg>
+      </div>
+      <div class="chart-box"><canvas id="egfrChart"></canvas></div>
+      <p class="key"><b>핵심은 숫자 하나가 아니라 흐름이에요.</b> 기증 후 1년 무렵 기증 전의 60~70%에서 자리를 잡고, 그 뒤로 <b>크게 떨어지지 않고 유지</b>되면 좋아요.</p>
+      <p class="fine">위치만 표시하며 판단은 의료진과 상담하세요</p>
+    </article>
+
+    <!-- 혈압 -->
+    <article class="bp chart-card">
+      <div class="chart-top">
+        <div>
+          <div class="card-title card-head">혈압 추이 <button class="why" data-why="bp">무엇을 봐야 해요?</button></div>
+          <div class="meta" id="bpSub"></div>
+        </div>
+        <div class="big" id="bp">-</div>
+      </div>
+      <div class="chart-box"><canvas id="bpChart"></canvas></div>
+      <p class="key"><b>점선(135/85) 아래에 머무는지</b>를 보세요. 하루 높은 건 괜찮아요. <b>며칠 계속 점선 위</b>라면 이식센터에 알려 주세요.</p>
+    </article>
+
+    <!-- 사이드 -->
+    <aside class="side">
+      <article class="kidney-card">
+        <div class="kidney-top">
+          <span class="card-title">나의 신장</span>
+          <div class="side-seg" id="sideSeg" title="기증한 쪽 (의료진이 기록)">
+            <span>기증한 쪽</span>
+            <button type="button" data-side="L">왼쪽</button>
+            <button type="button" data-side="R">오른쪽</button>
+          </div>
+        </div>
       <div class="kidney-stage">
         <svg viewBox="0 0 420 300" role="img" aria-label="나의 신장 그림">
           <defs>
@@ -234,6 +321,7 @@
               <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
             </filter>
           </defs>
+          <g id="anatomy">
 
           <!-- 가운데 대동맥 · 대정맥 (유리관) -->
           <defs>
@@ -293,63 +381,19 @@
                      pathLength="400" stroke-dasharray="80 320" class="orbit rev"/>
           </g>
 
+          </g>
           <!-- 설명 -->
-          <text x="396" y="24" text-anchor="end" font-size="12" font-weight="700" fill="#FFFFFF" font-family="Pretendard, sans-serif">나의 신장</text>
+          <text x="396" y="24" text-anchor="end" font-size="12" font-weight="700" fill="#FFFFFF" font-family="Pretendard, sans-serif" id="kidneyName">나의 신장</text>
           <text x="396" y="38" text-anchor="end" font-size="11" fill="#8FE0FF" font-family="Pretendard, sans-serif" id="remainEgfr"></text>
-          <line x1="372" y1="44" x2="334" y2="80" stroke="#8FE0FF" stroke-opacity=".55" stroke-width="1"/>
-          <circle cx="334" cy="80" r="2.6" fill="#BFF0FF" filter="url(#glow)"/>
+          <g id="pointer"><line x1="372" y1="44" x2="334" y2="80" stroke="#8FE0FF" stroke-opacity=".55" stroke-width="1"/>
+          <circle cx="334" cy="80" r="2.6" fill="#BFF0FF" filter="url(#glow)"/></g>
           <text x="210" y="298" text-anchor="middle" font-size="10" fill="#6F86B3" font-family="Pretendard, sans-serif" id="hilumNote"></text>
         </svg>
       </div>
-      <div class="hero-stats">
-        <div class="tile">
-          <div class="label">기증 후</div>
-          <div class="num" id="statDays">-</div>
-          <div class="sub" id="statDaysSub"></div>
-        </div>
-        <div class="tile">
-          <div class="label">최근 혈압</div>
-          <div class="num" id="statBp">-</div>
-          <div class="sub" id="statBpSub"></div>
-        </div>
-      </div>
-    </article>
-
-    <!-- eGFR -->
-    <article class="egfr chart-card">
-      <div class="chart-top">
-        <div>
-          <div class="card-title">나의 기준값 · eGFR</div>
-          <div class="meta" id="percentSub"></div>
-        </div>
-        <svg class="ring" viewBox="0 0 84 84" id="ring"></svg>
-      </div>
-      <div class="chart-box"><canvas id="egfrChart"></canvas></div>
-      <p class="fine">보통 기증 후 1년 무렵 기증 전의 60~70%에서 안정됩니다 · 위치만 표시하며 판단은 의료진과 상담하세요</p>
-    </article>
-
-    <!-- 혈압 -->
-    <article class="bp chart-card">
-      <div class="chart-top">
-        <div>
-          <div class="card-title">혈압 추이</div>
-          <div class="meta" id="bpSub"></div>
-        </div>
-        <div class="big" id="bp">-</div>
-      </div>
-      <div class="chart-box"><canvas id="bpChart"></canvas></div>
-    </article>
-
-    <!-- 사이드 -->
-    <aside class="side">
-      <article class="next">
-        <div class="label">다음 추적검사</div>
-        <div class="dday" id="statVisit">-</div>
-        <div class="sub" id="statVisitSub"></div>
-        <div class="flag" id="statVisitFlag"></div>
+        <p class="kidney-cap" id="kidneyCap"></p>
       </article>
       <article class="journey">
-        <span class="card-title">기증 후 여정</span>
+        <div class="card-head"><span class="card-title">기증 후 여정</span> <button class="why" data-why="journey">검사마다 뭘 해요?</button></div>
         <ul class="visit-list" id="timeline"></ul>
       </article>
     </aside>
@@ -358,6 +402,16 @@
 </main>
 
 <!-- 전체 기록 창 -->
+<dialog id="explainDialog">
+  <article>
+    <header>
+      <button aria-label="닫기" rel="prev" id="closeExplain"></button>
+      <strong id="explainTitle"></strong>
+    </header>
+    <div id="explainBody"></div>
+  </article>
+</dialog>
+
 <dialog id="recordsDialog">
   <article>
     <header>
@@ -417,6 +471,7 @@ const points = (color) => ({ pointRadius: 3.5, pointHoverRadius: 6, pointBackgro
 
 
 // ---------- 전체 불러오기 ----------
+let lastSummary = null;                           // 설명 창에서 쓰는 최근 요약
 async function loadAll() {
   const code = encodeURIComponent($("donorCode").value.trim());
   try {
@@ -427,10 +482,12 @@ async function loadAll() {
     ]);
     if (!sRes.ok) { $("todayStatus").textContent = "공여자 코드를 찾을 수 없습니다"; return; }
     const s = await sRes.json();
+    lastSummary = s;
     const rows = hRes.ok ? await hRes.json() : [];     // 자가 기록 (혈압·체중)
     const labs = lRes.ok ? await lRes.json() : [];     // 병원 검사 결과
     renderHeader(s, rows);
     renderHero(s, rows);
+    renderKidney(s);
     renderNext(s);
     renderTimeline(s.visits);
     renderRing(s);
@@ -467,6 +524,37 @@ function renderHero(s, rows) {
   $("statBp").innerHTML = lastBp ? `${lastBp.systolic_bp}/${lastBp.diastolic_bp ?? "-"}<small>mmHg</small>` : "-";
   $("statBpSub").textContent = lastBp ? `${dot(lastBp.measured_at)} 측정` : "기록 없음";
 }
+
+// ---------- 나의 신장 그림: 기증한 쪽에 따라 남은 신장 위치를 바꾼다 ----------
+// 그림은 '앞에서 마주 본 모습'이라, 몸의 오른쪽 신장이 그림의 왼쪽에 보인다.
+const SIDE_KO = { L: "왼쪽", R: "오른쪽" };
+let currentDonor = null;
+function renderKidney(s) {
+  currentDonor = s.donor_code;
+  const donated = s.donated_side;                       // "L" | "R" | null
+  const remain = donated === "L" ? "R" : donated === "R" ? "L" : null;
+  // 남은 신장이 몸의 오른쪽이면 그림 왼쪽에 보이게 좌우를 뒤집는다 (원래 그림은 남은 신장이 몸의 왼쪽)
+  const flip = remain === "R";
+  const mirror = flip ? "translate(420 0) scale(-1 1)" : "";
+  $("anatomy").setAttribute("transform", mirror);
+  $("pointer").setAttribute("transform", mirror);
+  ["kidneyName", "remainEgfr"].forEach((id) => {
+    $(id).setAttribute("x", flip ? 24 : 396);
+    $(id).setAttribute("text-anchor", flip ? "start" : "end");
+  });
+  $("kidneyName").textContent = remain ? `나의 ${SIDE_KO[remain]} 신장` : "나의 신장";
+  $("kidneyCap").textContent = donated
+    ? `${SIDE_KO[donated]} 신장을 기증 · 앞에서 마주 본 그림이라 좌우가 반대로 보여요`
+    : "기증한 쪽이 아직 기록되지 않았어요 · 위에서 골라 주세요";
+  document.querySelectorAll("#sideSeg button").forEach((b) => b.classList.toggle("on", b.dataset.side === donated));
+}
+$("sideSeg").addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b || !currentDonor) return;
+  const side = b.classList.contains("on") ? null : b.dataset.side;     // 다시 누르면 '기록 안 함'
+  const res = await fetch(`/donors/${encodeURIComponent(currentDonor)}/donated-side`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ side }) });
+  if (res.ok) loadAll();
+});
 
 // ---------- 다음 추적검사 ----------
 function renderNext(s) {
@@ -583,6 +671,79 @@ function renderTable(rows, labs) {
 
 // ---------- 창 열기/닫기 ----------
 $("openRecords").addEventListener("click", () => $("recordsDialog").showModal());
+
+// ---------- '왜 중요해요?' 설명 ----------
+// 일반인이 읽는 말로. 근거: KDIGO 2017 생체 신장 공여자 진료지침, 미국 OPTN 공여자 추적 기준.
+// 진단·처방이 아닌 일반 안내이며, 실제 운영 전 이식센터 의료진 검토가 필요하다.
+const SRC = `<p class="src">근거: KDIGO 2017 생체 신장 공여자 진료지침 · 미국 장기이식네트워크(OPTN) 공여자 추적 기준. 일반적인 안내이며, 내 몸에 대한 판단은 이식센터 의료진과 상의하세요.</p>`;
+const VISIT_DETAIL = {
+  "기증 후 6개월": ["회복이 잘 됐는지 보는 첫 검사", "수술 상처와 몸 상태, 혈압·체중, 피검사(크레아티닌·eGFR), 소변검사(단백)를 해요. 남은 신장 하나가 일을 더 맡아 잘 적응하고 있는지 처음으로 확인하는 때예요."],
+  "기증 후 1년": ["나의 '새 기준값'을 정하는 검사", "남은 신장의 기능은 보통 1년쯤 지나면 자리를 잡아요. 이때 결과가 앞으로 계속 비교할 기준이 돼요. 혈압·체중, 피검사, 소변검사를 해요."],
+  "기증 후 2년": ["기준값이 잘 유지되는지 보는 검사", "1년 때와 비교해 콩팥 기능이 유지되는지, 혈압이 오르지 않았는지, 소변에 단백이 새지 않는지 봐요. 미국 등에서는 기증 후 6개월·1년·2년 결과를 꼭 보고하도록 정해 두고 있어요."],
+  "기증 후 3년": ["이제부터는 해마다 한 번", "2년 이후에도 평생 1년에 한 번 혈압, 체중, 피검사(eGFR), 소변 단백을 확인하는 것이 권장돼요. 동네 병원에서 받아도 되고, 결과를 이식센터와 나누면 돼요."],
+};
+function explain(kind) {
+  const s = lastSummary || {};
+  const days = s.days_since_donation;
+  const visits = s.visits || [];
+  const missed = visits.filter((v) => v.status === "missed").map((v) => v.visit_name.replace("기증 후 ", ""));
+  const C = {
+    days: ["기증 후 날짜가 왜 중요해요?", `
+      <h4>남은 신장이 적응하는 시간이에요</h4>
+      <p>신장 하나를 기증하면, 남은 신장이 두 개 몫의 일을 나눠 맡으려고 조금 커지고 더 열심히 일해요. 이 적응은 기증 후 <b>약 1년</b>에 걸쳐 자리를 잡아요.${days != null ? ` 지금은 기증 후 <b>${days}일째</b>예요.` : ""}</p>
+      <h4>검사 날짜가 기증일에 맞춰 정해져요</h4>
+      <p>6개월 · 1년 · 2년 검사는 모두 기증일을 기준으로 정해져요. 그래서 기증 후 며칠째인지 알면 다음 검사가 언제인지, 지금이 검사 기간인지 바로 알 수 있어요.</p>
+      <h4>시간이 지나도 계속 살펴봐야 해요</h4>
+      <p>기증자 대부분은 건강하게 지내요. 다만 기증하지 않은 사람에 비해 시간이 지나며 <b>혈압이 오르거나 소변에 단백이 새는 일</b>이 조금 더 생길 수 있다고 알려져 있어요. 그래서 오래 지나도 1년에 한 번은 확인하는 것이 권장돼요.</p>${SRC}`],
+    missed: ["검사를 놓치면 왜 위험해요?", `
+      ${missed.length ? `<p style="color:var(--warn)"><b>지금 받지 못한 검사: ${missed.join(", ")}</b> — 이식센터에 연락해 날짜를 다시 잡아 주세요.</p>` : ""}
+      <h4>문제가 생겨도 대부분 아프지 않아요</h4>
+      <p>혈압이 오르는 것, 소변에 단백이 새는 것, 콩팥 기능이 조금씩 떨어지는 것은 <b>대개 아무 증상이 없어요.</b> 몸이 괜찮다고 느껴도 검사를 해야만 알 수 있어요.</p>
+      <h4>일찍 찾으면 지킬 수 있어요</h4>
+      <p>일찍 발견하면 짠 음식 줄이기, 체중 관리, 혈압약 같은 방법으로 남은 신장을 지킬 수 있어요. 검사를 놓치면 이런 변화를 <b>늦게 발견</b>하게 돼요.</p>
+      <h4>검사에는 받는 기간이 있어요</h4>
+      <p>각 검사는 예정일 <b>앞뒤 60일 안에</b> 받으면 돼요. 이 기간이 지나면 '놓침'으로 표시돼요. 늦었더라도 지금 받는 것이 안 받는 것보다 훨씬 나아요.</p>
+      <h4>다른 기증자에게도 도움이 돼요</h4>
+      <p>기증 후 검사 결과는 '기증이 얼마나 안전한지'를 알려 주는 자료가 돼요. 미국 등에서는 병원이 6개월·1년·2년 결과를 의무로 보고해요.</p>${SRC}`],
+    bp: ["혈압은 무엇을 봐야 해요?", `
+      <h4>혈압이 남은 신장을 지키는 가장 중요한 숫자예요</h4>
+      <p>혈압이 높은 상태가 오래 이어지면 신장의 작은 혈관이 다쳐요. 신장이 하나인 기증자에게는 혈압 관리가 특히 중요해요.</p>
+      <h4>기준: 집에서 잰 혈압 135/85 미만</h4>
+      <p>그래프의 <b>점선</b>이 이 기준이에요. 병원에서 잰 혈압(140/90)보다 기준이 조금 낮은 건, 집에서는 긴장이 덜해 혈압이 낮게 나오기 때문이에요.</p>
+      <h4>하루가 아니라 흐름을 보세요</h4>
+      <ul><li>하루 높게 나오는 건 흔해요. 커피, 잠, 긴장에도 바뀌어요.</li>
+          <li><b>며칠 계속 점선 위</b>에 있거나, 몇 주에 걸쳐 <b>점점 올라가는 모양</b>이면 이식센터에 알려 주세요.</li>
+          <li>90/60보다 낮고 어지러우면 그것도 알려 주세요.</li>
+          <li>180/110 이상이면 5분 쉬고 다시 재고, 두통·가슴 통증·숨참이 있으면 바로 119에 연락하세요.</li></ul>
+      <h4>잘 재는 법</h4>
+      <p>아침에 일어나 소변 본 뒤, 약·식사 전에, 5분 앉아 쉬고 재요. 매일 같은 시간에 재야 비교가 돼요.</p>${SRC}`],
+    egfr: ["eGFR은 무엇을 봐야 해요?", `
+      <h4>eGFR은 '콩팥이 피를 거르는 힘'을 점수로 나타낸 거예요</h4>
+      <p>피검사의 크레아티닌 값과 나이·성별로 계산해요. 숫자가 클수록 잘 걸러요.</p>
+      <h4>기증 전보다 낮아지는 건 정상이에요</h4>
+      <p>신장이 하나가 되었으니 점수가 줄어드는 게 당연해요. 보통 기증 전의 <b>60~70%</b>쯤에서 1년 무렵 자리를 잡아요. 그래프의 <b>옅은 띠</b>가 이 범위예요.</p>
+      <h4>중요한 건 '흐름'이에요</h4>
+      <ul><li><b>좋은 모양:</b> 1년 뒤 자리를 잡고 그 근처에서 비슷하게 유지돼요.</li>
+          <li><b>살펴볼 모양:</b> 1년 이후에도 검사 때마다 계속 떨어지거나, 한 번에 크게 떨어진 경우예요.</li>
+          <li>기증자는 점수가 60 근처인 경우가 흔해서 숫자 하나만으로 판단하지 않아요. <b>소변 단백, 혈압과 함께</b> 의료진이 판단해요.</li></ul>
+      <h4>지키는 방법</h4>
+      <p>혈압 관리, 적정 체중, 금연, 그리고 소염진통제(이부프로펜 등)를 오래 먹지 않는 것이 남은 신장을 지키는 데 도움이 돼요.</p>${SRC}`],
+    journey: ["기증 후 여정 · 검사마다 하는 일", `
+      <p>기증 후에는 정해진 때마다 이식센터에서 검사를 받아요. 각 검사는 예정일 <b>앞뒤 60일 안에</b> 받으면 돼요.</p>
+      ${(visits.length ? visits : Object.keys(VISIT_DETAIL).map((n) => ({ visit_name: n }))).map((v) => {
+        const d = VISIT_DETAIL[v.visit_name] || ["", ""];
+        const st = v.status ? ` · ${STATUS_LABEL[v.status]}` : "";
+        return `<div class="visit ${v.status || ""}"><b>${v.visit_name.replace("기증 후 ", "")} — ${d[0]}${st}</b>${d[1]}</div>`;
+      }).join("")}
+      <div class="visit"><b>그 이후 — 평생 1년에 한 번</b>혈압, 체중, 피검사(eGFR), 소변 단백을 확인해요. 여성 기증자는 임신 계획이 있으면 미리 이식센터와 상의하세요.</div>${SRC}`],
+  };
+  const [title, body] = C[kind];
+  $("explainTitle").textContent = title;
+  $("explainBody").innerHTML = body;
+  $("explainDialog").showModal();
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-why]"); if (b) explain(b.dataset.why); });
+$("closeExplain").addEventListener("click", () => $("explainDialog").close());
 $("closeRecords").addEventListener("click", () => $("recordsDialog").close());
 $("donorCode").addEventListener("change", loadAll);
 
