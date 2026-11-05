@@ -1,13 +1,16 @@
 import io
 from pathlib import Path
 import json
+import re
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
 import pandas as pd
 import agent
 import auth
+import consult
+import vision
 import ecrf
 import emr
 import threading
@@ -85,19 +88,50 @@ REFERENCE = {
 UP_KO = {"Negative": "음성", "Trace": "미량", "1+": "1+ (양성)", "2+": "2+ (양성)", "3+": "3+ (양성)"}
 
 
+# 혈압이 기준을 벗어났을 때 일반인이 따라 할 수 있는 대처 (화면에 단계로 보여 주고, 소리로도 읽어 준다)
+# 내용은 일반적인 가정혈압 안내 수준이며, 진단·처방이 아니다. 실제 운영 시 이식센터 의료진 검토가 필요하다.
+BP_GUIDE = {
+    "crisis": {
+        "title": "혈압이 매우 높아요",
+        "advice": "5분 쉬고 다시 재 주세요. 다시 재도 높거나 두통·가슴 통증·숨참이 있으면 바로 병원(응급실)이나 119에 연락하세요.",
+        "steps": ["하던 일을 멈추고 의자에 편하게 앉으세요.",
+                  "5분 동안 말하지 말고 쉰 다음, 같은 팔로 한 번 더 재 주세요.",
+                  "다시 재도 180/110 이상이면, 증상이 없어도 오늘 안에 이식센터나 병원에 전화하세요.",
+                  "혈압약을 더 먹거나 빼먹은 약을 한꺼번에 먹지 마세요. 약은 의료진과 상의한 대로만 드세요."],
+        "urgent": ["심한 두통", "가슴 통증이나 답답함", "숨이 참", "말이 어눌하거나 한쪽 팔다리에 힘이 빠짐",
+                   "앞이 흐리게 보임"],
+    },
+    "high": {
+        "title": "혈압이 기준보다 높아요",
+        "advice": f"가정혈압 기준은 {BP_HOME_SYS}/{BP_HOME_DIA} 미만이에요. 5분 쉬고 다시 재 보고, 며칠 계속 높으면 이식센터에 알려 주세요.",
+        "steps": ["의자에 등을 기대고 앉아 5분 쉬세요. 커피·담배·운동 직후라면 30분 뒤에 재세요.",
+                  "팔을 심장 높이에 두고, 같은 팔로 한 번 더 재 주세요. 두 번째 값을 기록하면 돼요.",
+                  "한 번 높은 건 흔한 일이에요. 며칠 동안 계속 높으면 이식센터에 알려 주세요.",
+                  "짠 음식을 줄이고, 진통제(이부프로펜 같은 소염진통제)는 콩팥과 혈압에 부담이 되니 먹기 전에 물어보세요."],
+        "urgent": ["심한 두통", "가슴 통증", "숨이 참", "말이 어눌하거나 한쪽 팔다리에 힘이 빠짐"],
+    },
+    "low": {
+        "title": "혈압이 낮게 나왔어요",
+        "advice": "앉아서 천천히 물을 마시고 다시 재 보세요. 어지럽거나 쓰러질 것 같으면 이식센터나 병원에 연락하세요.",
+        "steps": ["어지럽지 않고 몸이 괜찮다면 크게 걱정하지 않아도 돼요. 평소에도 혈압이 낮은 분이 있어요.",
+                  "어지러우면 바로 앉거나 누워서 다리를 조금 높이 올리세요. 넘어지지 않는 게 가장 중요해요.",
+                  "물을 한두 컵 천천히 마시세요. 설사·구토가 있었거나 땀을 많이 흘렸다면 몸에 물이 부족할 수 있어요.",
+                  "일어날 때는 앉았다가 천천히 일어나세요. 혈압약을 드시면 마음대로 끊지 말고 이식센터에 물어보세요."],
+        "urgent": ["정신을 잃었거나 잃을 것 같음", "가슴 통증", "숨이 참", "어지러움이 쉬어도 나아지지 않음"],
+    },
+}
+
+
 def bp_assess(sys_: int | None, dia: int | None) -> dict:
     """혈압 한 번의 값을 판정한다. DB를 보지 않는 순수 함수 (저장 직후 화면 안내에 쓴다)."""
     if sys_ is None or dia is None:
         return {"level": "none", "title": "혈압 값이 없어요", "advice": ""}
     if sys_ >= BP_CRISIS_SYS or dia >= BP_CRISIS_DIA:
-        return {"level": "crisis", "title": "혈압이 매우 높아요",
-                "advice": "5분 쉬고 다시 재 주세요. 다시 재도 높거나 두통·가슴 통증·숨참이 있으면 바로 병원(응급실)이나 119에 연락하세요."}
+        return {"level": "crisis", **BP_GUIDE["crisis"]}
     if sys_ >= BP_HOME_SYS or dia >= BP_HOME_DIA:
-        return {"level": "high", "title": "혈압이 기준보다 높아요",
-                "advice": f"가정혈압 기준은 {BP_HOME_SYS}/{BP_HOME_DIA} 미만이에요. 5분 쉬고 다시 재 보고, 며칠 계속 높으면 이식센터에 알려 주세요."}
+        return {"level": "high", **BP_GUIDE["high"]}
     if sys_ < BP_LOW_SYS or dia < BP_LOW_DIA:
-        return {"level": "low", "title": "혈압이 낮게 나왔어요",
-                "advice": "앉아서 천천히 물을 마시고 다시 재 보세요. 어지럽거나 쓰러질 것 같으면 이식센터나 병원에 연락하세요."}
+        return {"level": "low", **BP_GUIDE["low"]}
     return {"level": "normal", "title": "정상 범위예요",
             "advice": f"가정혈압 기준({BP_HOME_SYS}/{BP_HOME_DIA} 미만) 안에 있어요. 내일도 같은 시간에 재 주세요."}
 
@@ -158,6 +192,10 @@ CREATE TABLE IF NOT EXISTS consult_requests (
     created_at    TIMESTAMPTZ DEFAULT now(),
     handled_at    TIMESTAMPTZ
 );
+-- 전화 예약: 담당자가 전화할 시각. 같은 시각에 처리 전 예약이 둘 생기지 않게 막는다.
+ALTER TABLE consult_requests ADD COLUMN IF NOT EXISTS callback_at TIMESTAMPTZ;
+CREATE UNIQUE INDEX IF NOT EXISTS consult_requests_slot ON consult_requests (callback_at)
+    WHERE status = 'new' AND callback_at IS NOT NULL;
 """
 
 
@@ -205,9 +243,9 @@ def prepare_database():
         with get_conn() as conn:
             # 이미 준비된 DB면 질의 1번으로 끝낸다 (서버리스는 서버가 새로 뜰 때마다 이 함수를 부른다)
             ready = conn.execute(
-                "SELECT to_regclass('public.consult_requests') IS NOT NULL AS t, "
+                "SELECT to_regclass('public.consult_requests_slot') IS NOT NULL AS t, "
                 "(SELECT count(*) FROM pg_tables WHERE tablename = 'users') AS u").fetchone()
-            if ready["t"] and ready["u"]:
+            if ready["t"] and ready["u"]:                # 마지막에 추가한 것(전화 예약 색인)까지 있으면 준비된 DB
                 if not (demo_reset_on() and os.getenv("DEMO_PASSWORD")):
                     return
                 names = [a[0] for a in DEMO_ACCOUNTS]
@@ -622,6 +660,26 @@ class HomeIn(BaseModel):
         return v
 
 
+class MonitorPhotoIn(BaseModel):
+    image: str = Field(max_length=3_000_000)          # data:image/jpeg;base64,... (화면에서 1280px 이하로 줄여 보냄)
+
+    @field_validator("image")
+    @classmethod
+    def is_image(cls, v: str) -> str:
+        if not re.match(r"^data:image/(jpeg|png|webp);base64,", v):
+            raise ValueError("사진 파일만 보낼 수 있어요")
+        return v
+
+
+@app.post("/donors/{donor_code}/read-monitor", dependencies=[Depends(donor_access)])
+def read_monitor_photo(donor_code: str, body: MonitorPhotoIn):
+    """혈압계 사진에서 숫자를 읽어 돌려준다. 저장하지 않는다 (사람이 확인 후 저장)."""
+    try:
+        return vision.read_monitor(body.image)
+    except vision.VisionError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
 @app.post("/home-measurements")
 def create_home(m: HomeIn, user: dict = Depends(current_user)):
     """자가 기록 저장. 같은 날짜 기록이 있으면 새 값으로 덮어쓴다."""
@@ -995,37 +1053,82 @@ CONSULT_TOPICS = {
 @app.get("/guide/contact")
 def contact_info():
     """이식센터 연락처 (.env 의 CENTER_PHONE · CENTER_HOURS, 없으면 데모 안내)"""
-    return {"phone": os.getenv("CENTER_PHONE") or "", "hours": os.getenv("CENTER_HOURS") or "평일 09:00 ~ 17:00",
+    return {"phone": os.getenv("CENTER_PHONE") or "", "hours": os.getenv("CENTER_HOURS") or "평일 09:00 ~ 17:00 (점심 12~13시 제외)",
+            "open_now": consult.is_open(datetime.now(timezone.utc)), "demo": demo_reset_on(),
             "topics": CONSULT_TOPICS}
+
+
+def _taken_slots(conn) -> set:
+    rows = conn.execute("SELECT callback_at FROM consult_requests WHERE status = 'new' AND callback_at >= now()").fetchall()
+    return {r["callback_at"] for r in rows}
+
+
+@app.get("/donors/{donor_code}/consult/slots", dependencies=[Depends(donor_access)])
+def consult_slots(donor_code: str):
+    """전화 예약 시간표 (근무일 5일, 30분 단위). 이미 예약된 시간은 taken."""
+    with get_conn() as conn:
+        taken = _taken_slots(conn)
+    return consult.slot_table(datetime.now(timezone.utc), taken)
 
 
 class ConsultIn(BaseModel):
     topic: Literal["test", "health", "mind"]
     message: str | None = Field(None, max_length=500)
-    contact_time: Literal["오전", "오후", "언제든"] = "언제든"
+    contact_time: Literal["오전", "오후", "언제든", "예약"] = "언제든"
+    callback_at: datetime | None = None                           # 전화 예약 시각 (시간표에서 고른 값)
 
 
 @app.post("/donors/{donor_code}/consult", dependencies=[Depends(donor_access)])
 def create_consult(donor_code: str, body: ConsultIn):
     """공여자가 상담을 요청한다. 같은 주제로 처리되지 않은 요청이 있으면 새로 만들지 않고 내용을 덧붙인다."""
+    at = body.callback_at
+    if at is not None:
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=consult.KST)
+        if not consult.valid_slot(at, datetime.now(timezone.utc)):
+            raise HTTPException(status_code=422, detail="고를 수 없는 시간이에요. 시간표에서 다시 골라 주세요.")
+        body.contact_time = "예약"
+    taken_msg = "방금 다른 분이 예약한 시간이에요. 다른 시간을 골라 주세요."
+    try:
+        with get_conn() as conn:
+            donor = get_donor(conn, donor_code)
+            if at is not None and at in _taken_slots(conn):
+                raise HTTPException(status_code=409, detail=taken_msg)
+            open_req = conn.execute(
+                "SELECT request_id FROM consult_requests WHERE donor_id = %s AND topic = %s AND status = 'new'",
+                (donor["donor_id"], body.topic),
+            ).fetchone()
+            if open_req:
+                conn.execute(
+                    "UPDATE consult_requests SET message = concat_ws(E'\\n', message, %s::text), contact_time = %s, "
+                    "callback_at = coalesce(%s, callback_at), created_at = now() WHERE request_id = %s",
+                    (body.message, body.contact_time, at, open_req["request_id"]),
+                )
+                return {"request_id": open_req["request_id"], "updated": True,
+                        "callback_label": consult.label(at) if at else None}
+            row = conn.execute(
+                "INSERT INTO consult_requests (donor_id, topic, message, contact_time, callback_at) "
+                "VALUES (%s, %s, %s, %s, %s) RETURNING request_id",
+                (donor["donor_id"], body.topic, body.message, body.contact_time, at),
+            ).fetchone()
+    except psycopg.errors.UniqueViolation:            # 두 사람이 같은 순간에 같은 시간을 고른 경우
+        raise HTTPException(status_code=409, detail=taken_msg)
+    return {"request_id": row["request_id"], "updated": False, "callback_label": consult.label(at) if at else None}
+
+
+@app.post("/donors/{donor_code}/consult/{request_id}/cancel", dependencies=[Depends(donor_access)])
+def cancel_consult(donor_code: str, request_id: int):
+    """공여자가 자기 상담 요청(예약)을 취소한다. 기록은 남기고 '취소'로 닫는다."""
     with get_conn() as conn:
         donor = get_donor(conn, donor_code)
-        open_req = conn.execute(
-            "SELECT request_id FROM consult_requests WHERE donor_id = %s AND topic = %s AND status = 'new'",
-            (donor["donor_id"], body.topic),
-        ).fetchone()
-        if open_req:
-            conn.execute(
-                "UPDATE consult_requests SET message = concat_ws(E'\\n', message, %s::text), contact_time = %s, created_at = now() "
-                "WHERE request_id = %s",
-                (body.message, body.contact_time, open_req["request_id"]),
-            )
-            return {"request_id": open_req["request_id"], "updated": True}
         row = conn.execute(
-            "INSERT INTO consult_requests (donor_id, topic, message, contact_time) VALUES (%s, %s, %s, %s) RETURNING request_id",
-            (donor["donor_id"], body.topic, body.message, body.contact_time),
+            "UPDATE consult_requests SET status = 'done', staff_note = '공여자가 취소했어요', handled_by = '공여자', handled_at = now() "
+            "WHERE request_id = %s AND donor_id = %s AND status = 'new' RETURNING request_id",
+            (request_id, donor["donor_id"]),
         ).fetchone()
-    return {"request_id": row["request_id"], "updated": False}
+    if row is None:
+        raise HTTPException(status_code=404, detail="취소할 수 있는 요청이 없어요")
+    return {"ok": True}
 
 
 @app.get("/donors/{donor_code}/consult", dependencies=[Depends(donor_access)])
@@ -1034,12 +1137,13 @@ def list_my_consults(donor_code: str):
     with get_conn() as conn:
         donor = get_donor(conn, donor_code)
         rows = conn.execute(
-            "SELECT request_id, topic, message, contact_time, status, staff_note, created_at, handled_at "
+            "SELECT request_id, topic, message, contact_time, callback_at, status, staff_note, created_at, handled_at "
             "FROM consult_requests WHERE donor_id = %s ORDER BY created_at DESC LIMIT 10",
             (donor["donor_id"],),
         ).fetchall()
     for r in rows:
         r["topic_label"] = CONSULT_TOPICS.get(r["topic"], r["topic"])
+        r["callback_label"] = consult.label(r["callback_at"]) if r["callback_at"] else None
     return rows
 
 
@@ -1048,13 +1152,15 @@ def staff_consults(status: Literal["new", "done", "all"] = "new"):
     """의료진: 상담 요청 목록. 처리 전 요청이 먼저, 오래 기다린 순으로."""
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT c.request_id, d.donor_code, c.topic, c.message, c.contact_time, c.status, c.staff_note, "
+            "SELECT c.request_id, d.donor_code, c.topic, c.message, c.contact_time, c.callback_at, c.status, c.staff_note, "
             "c.handled_by, c.created_at, c.handled_at FROM consult_requests c JOIN donors d ON d.donor_id = c.donor_id "
-            "WHERE %s::text = 'all' OR c.status = %s::text ORDER BY (c.status = 'done'), c.created_at LIMIT 100",
+            "WHERE %s::text = 'all' OR c.status = %s::text "
+            "ORDER BY (c.status = 'done'), c.callback_at NULLS LAST, c.created_at LIMIT 100",
             (status, status),
         ).fetchall()
     for r in rows:
         r["topic_label"] = CONSULT_TOPICS.get(r["topic"], r["topic"])
+        r["callback_label"] = consult.label(r["callback_at"]) if r["callback_at"] else None
     return rows
 
 

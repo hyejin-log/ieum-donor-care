@@ -142,6 +142,26 @@
     .topic-list input { margin: 0; }
     .call-btn { display: block; text-align: center; margin: 0 0 14px; padding: 14px; border-radius: 16px; background: var(--ok); color: #fff;
                 font-weight: 800; font-size: 1.05rem; text-decoration: none; }
+    .call-card { border-radius: 18px; padding: 14px; margin: 0 0 16px; background: var(--ok-soft); }
+    .call-card.closed { background: var(--soft); }
+    .call-card p { margin: 0 0 10px; font-size: .92rem; color: var(--ink); line-height: 1.5; }
+    .call-card .call-btn { margin: 0; }
+    .call-card small { display: block; color: var(--muted); font-size: .8rem; margin-top: 8px; text-align: center; }
+    .seg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--soft); border-radius: 16px; padding: 4px; margin: 0 0 12px; }
+    .seg2 button { margin: 0; padding: 10px 4px; border-radius: 12px; border: none; background: none; color: var(--muted); font-weight: 800; font-size: .95rem; }
+    .seg2 button.on { background: var(--card); color: var(--navy); box-shadow: 0 1px 3px rgba(23,35,61,.12); }
+    .days { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin: 0 0 10px; }
+    .days button { flex: none; width: auto; margin: 0; padding: 9px 12px; border-radius: 12px; font-size: .9rem; font-weight: 700;
+                   background: var(--card); color: var(--navy); border: 1.5px solid var(--line); }
+    .days button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 12px; }
+    .times button { margin: 0; padding: 12px 0; border-radius: 12px; font-size: 1rem; font-weight: 800;
+                    background: var(--card); color: var(--navy); border: 1.5px solid var(--line); }
+    .times button.on { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .times button:disabled { color: #B9C2D0; text-decoration: line-through; background: var(--soft); border-color: var(--soft); }
+    .picked { font-size: .95rem; font-weight: 800; color: var(--blue); margin: 0 0 12px; min-height: 1.4em; }
+    .noti-list .cancel { width: auto; margin: 6px 0 0; padding: 6px 12px; font-size: .82rem; border-radius: 999px;
+                         background: none; color: var(--warn); border: 1px solid var(--warn); }
     .chat-hint { font-size: .85rem; color: var(--muted); margin: 0 0 4px; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chips button { margin: 0; width: auto; padding: 7px 12px; font-size: .78rem; border-radius: 999px;
@@ -209,6 +229,22 @@
     .result.normal { background: var(--ok-soft); color: #1F6E55; }
     .result.high, .result.low { background: var(--amber-soft); color: #8A5B0A; }
     .result.crisis { background: var(--warn-soft); color: #A63E26; }
+    .result ol { margin: 10px 0 0; padding-left: 1.3em; }
+    .result ol li { margin: 0 0 6px; font-size: .95rem; line-height: 1.5; }
+    .result .urgent { margin-top: 10px; background: #fff; border-radius: 12px; padding: 10px 12px; color: #A63E26; font-size: .9rem; line-height: 1.5; }
+    .result .urgent a { display: block; margin-top: 8px; text-align: center; padding: 10px; border-radius: 12px; background: #D9472B; color: #fff; font-weight: 800; text-decoration: none; }
+    .result-tools { display: flex; gap: 8px; margin-top: 10px; }
+    .result-tools button { margin: 0; width: auto; flex: 1; padding: 9px 6px; font-size: .88rem; border-radius: 12px;
+                           background: var(--card); color: var(--navy); border: 1.5px solid var(--line); font-weight: 700; }
+    .easy-in { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 12px; }
+    .easy-in button { margin: 0; padding: 14px 6px; border-radius: 16px; font-size: 1rem; font-weight: 800;
+                      background: var(--blue-soft); color: var(--navy); border: none; line-height: 1.3; }
+    .easy-in button small { display: block; font-weight: 500; font-size: .75rem; color: var(--muted); }
+    .easy-in button.on { background: var(--blue); color: #fff; }
+    .easy-in button.on small { color: #E3EBFC; }
+    .in-note { border-radius: 12px; padding: 10px 12px; font-size: .9rem; margin: 0 0 12px; background: var(--amber-soft); color: #8A5B0A; line-height: 1.5; }
+    .in-note.ok { background: var(--ok-soft); color: #1F6E55; }
+    input.filled { border-color: var(--blue) !important; background: #F0F5FF !important; }
     /* 설명 창 */
     .ref { width: 100%; font-size: .8rem; margin: 8px 0; }
     .ref td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
@@ -388,6 +424,12 @@
       <ul id="howtoList"></ul>
     </details>
     <form id="form">
+      <div class="easy-in">
+        <button type="button" id="voiceIn">🎤 말로 입력<small>"백이십에 팔십, 체중 육십"</small></button>
+        <button type="button" id="photoIn">📷 사진으로 입력<small>혈압계 화면을 찍어요</small></button>
+      </div>
+      <input type="file" id="photoFile" accept="image/*" capture="environment" hidden>
+      <p class="in-note" id="inNote" hidden></p>
       <label>측정 날짜 <input type="date" name="measured_at" required></label>
       <div class="grid2">
         <label>앞 숫자 (수축기) <input type="number" name="systolic_bp" min="50" max="260" placeholder="예: 120" inputmode="numeric" required></label>
@@ -467,13 +509,25 @@
     </header>
     <div id="consultCall"></div>
     <form id="consultForm">
-      <p class="note" style="margin:0 0 8px"><b>무엇을 상담하고 싶으세요?</b> 남겨 주시면 담당자가 전화를 드려요.</p>
+      <p class="note" style="margin:0 0 8px"><b>1. 무엇을 상담하고 싶으세요?</b></p>
       <div class="topic-list" id="topicList"></div>
-      <label>하고 싶은 말 (선택)<textarea name="message" rows="3" maxlength="500" placeholder="예: 다음 검사 날짜를 바꾸고 싶어요"></textarea></label>
-      <label>전화 받기 편한 시간
-        <select name="contact_time"><option>언제든</option><option>오전</option><option>오후</option></select>
-      </label>
-      <button type="submit">상담 요청 보내기</button>
+      <p class="note" style="margin:0 0 8px"><b>2. 언제 전화 받으시겠어요?</b> 담당자가 전화를 드려요.</p>
+      <div class="seg2" id="whenSeg">
+        <button type="button" data-when="book" class="on">⏰ 시간 정해서 예약</button>
+        <button type="button" data-when="any">🔁 편할 때 연락받기</button>
+      </div>
+      <div id="bookBox">
+        <div class="days" id="dayList"></div>
+        <div class="times" id="timeList"></div>
+        <p class="picked" id="pickedLabel"></p>
+      </div>
+      <div id="anyBox" hidden>
+        <label>전화 받기 편한 때
+          <select name="contact_time"><option>언제든</option><option>오전</option><option>오후</option></select>
+        </label>
+      </div>
+      <label>하고 싶은 말 (선택)<textarea name="message" rows="2" maxlength="500" placeholder="예: 다음 검사 날짜를 바꾸고 싶어요"></textarea></label>
+      <button type="submit" id="consultSubmit">이 시간으로 예약하기</button>
       <p id="consultMsg"></p>
     </form>
     <div id="consultDone" hidden></div>
@@ -887,15 +941,178 @@ $("form").addEventListener("submit", async (e) => {
     if (res.ok) {
       const d = await res.json();
       e.target.reset(); dateInput.value = today; loadAll();
-      // 저장 직후 혈압 판정을 바로 보여 준다
-      const b = d.bp || { level: "normal", title: "저장했어요", advice: "" };
-      $("result").className = `result ${b.level}`;
-      $("result").innerHTML = `<b>${body.systolic_bp}/${body.diastolic_bp} mmHg · ${b.title}</b>${b.advice}`;
-      $("form").hidden = true; $("resultBox").hidden = false;
+      // 저장 직후 혈압 판정을 바로 보여 주고, 벗어났으면 소리와 함께 대처 방법을 알려 준다
+      showBpResult(body, d.bp || { level: "normal", title: "저장했어요", advice: "" });
     }
     else { showMsg("저장 실패: " + errText(await readJson(res)), false); }
   } catch { showMsg("서버에 연결할 수 없습니다.", false); }
 });
+
+// ---------- 저장 결과: 판정 · 대처 방법 · 알림 소리 · 읽어 주기 ----------
+const soundOn = () => { try { return localStorage.getItem("ieum_sound") !== "off"; } catch { return true; } };
+let lastResult = null;
+function showBpResult(body, b) {
+  lastResult = { body, b };
+  $("inNote").hidden = true;
+  document.querySelectorAll("#form input.filled").forEach((x) => x.classList.remove("filled"));
+  const warn = ["high", "low", "crisis"].includes(b.level);
+  const steps = (b.steps || []).length ? `<ol>${b.steps.map((t) => `<li>${t}</li>`).join("")}</ol>` : (b.advice || "");
+  const urgent = (b.urgent || []).length
+    ? `<div class="urgent">⚠️ <b>이럴 땐 기다리지 말고 바로 119</b>${b.urgent.join(" · ")}<a href="tel:119">📞 119에 전화하기</a></div>` : "";
+  $("result").className = `result ${b.level}`;
+  $("result").innerHTML = `<b>${body.systolic_bp}/${body.diastolic_bp} mmHg · ${b.title}</b>${warn ? "<span>이렇게 해 보세요</span>" : ""}${steps}${urgent}
+    <div class="result-tools">
+      <button type="button" id="readAgain">🔊 다시 듣기</button>
+      ${warn ? `<button type="button" id="resultConsult">👩‍⚕️ 상담 연결</button>` : ""}
+      <button type="button" id="soundToggle">${soundOn() ? "🔇 소리 끄기" : "🔔 소리 켜기"}</button>
+    </div>`;
+  $("form").hidden = true; $("resultBox").hidden = false;
+  $("readAgain").onclick = () => speakResult(true);
+  if (warn) $("resultConsult").onclick = () => { $("formDialog").close(); openConsult(); };
+  $("soundToggle").onclick = () => {
+    const on = !soundOn();
+    try { localStorage.setItem("ieum_sound", on ? "on" : "off"); } catch {}
+    if (!on) { try { speechSynthesis.cancel(); } catch {} }
+    $("soundToggle").textContent = on ? "🔇 소리 끄기" : "🔔 소리 켜기";
+  };
+  if (soundOn()) { playAlert(b.level).then(() => { if (warn) speakResult(false); }); }
+}
+// 알림 소리: 정상은 짧고 부드럽게, 높음·낮음은 '삐-삐-삐', 매우 높음은 더 크고 두 번 반복
+function playAlert(level) {
+  return new Promise((done) => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const plan = {
+        normal: [[660, 0, .15, .12], [880, .17, .22, .12]],
+        high:   [[880, 0, .25, .3], [880, .4, .25, .3], [880, .8, .25, .3]],
+        low:    [[520, 0, .3, .3], [440, .45, .3, .3], [370, .9, .4, .3]],
+        crisis: [[1000, 0, .2, .45], [750, .25, .2, .45], [1000, .5, .2, .45], [750, .75, .2, .45],
+                 [1000, 1.3, .2, .45], [750, 1.55, .2, .45], [1000, 1.8, .2, .45], [750, 2.05, .2, .45]],
+      }[level] || [];
+      let end = 0;
+      plan.forEach(([hz, at, len, vol]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "sine"; o.frequency.value = hz;
+        const t0 = ctx.currentTime + at;
+        g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + .02);
+        g.gain.setValueAtTime(vol, t0 + len - .04); g.gain.linearRampToValueAtTime(0, t0 + len);
+        o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0 + len + .02);
+        end = Math.max(end, at + len);
+      });
+      setTimeout(() => { ctx.close(); done(); }, end * 1000 + 300);
+    } catch { done(); }
+  });
+}
+// 결과를 소리로 읽어 주기 (어르신이 글을 다 읽지 않아도 되게). all=false 면 제목과 첫 단계만
+function speakResult(all) {
+  if (!lastResult || !window.speechSynthesis) return;
+  const { body, b } = lastResult;
+  const steps = b.steps || [];
+  const text = [`혈압 ${body.systolic_bp}에 ${body.diastolic_bp}. ${b.title}.`, ...(all ? steps : steps.slice(0, 1)),
+                ...(all && b.urgent ? [`${b.urgent.join(", ")}. 이런 증상이 있으면 바로 119에 전화하세요.`] : []),
+                ...(!steps.length && b.advice ? [b.advice] : [])].join(" ");
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ko-KR"; u.rate = 0.9;
+    speechSynthesis.speak(u);
+  } catch {}
+}
+$("formDialog").addEventListener("close", () => { try { speechSynthesis.cancel(); } catch {} });
+
+// ---------- 쉽게 입력: 말로 · 사진으로 ----------
+function inNote(text, ok) { $("inNote").innerHTML = text; $("inNote").className = `in-note${ok ? " ok" : ""}`; $("inNote").hidden = false; }
+function fillValues(v) {
+  const f = $("form");
+  [["systolic_bp", v.systolic], ["diastolic_bp", v.diastolic], ["weight_kg", v.weight]].forEach(([k, val]) => {
+    if (val == null) return;
+    f[k].value = val; f[k].classList.add("filled");
+  });
+}
+// 한글로 읽은 숫자("백이십", "육십 점 오")를 아라비아 숫자로 바꾼다
+const KD = { 영: 0, 공: 0, 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 륙: 6, 칠: 7, 팔: 8, 구: 9 };
+function koInt(w) {
+  let total = 0, cur = 0;
+  for (const ch of w) {
+    if (ch in KD) cur = KD[ch];
+    else if (ch === "십") { total += (cur || 1) * 10; cur = 0; }
+    else if (ch === "백") { total += (cur || 1) * 100; cur = 0; }
+  }
+  return total + cur;
+}
+function koDigits(text) {
+  return text.replace(/[영공일이삼사오육륙칠팔구십백]+(?:\s?점\s?[영공일이삼사오육륙칠팔구]+)?/g, (m) => {
+    if (!/[십백점]/.test(m)) return m;                      // "이", "오늘" 같은 낱말은 그대로 둔다
+    const [a, b] = m.replace(/\s/g, "").split("점");
+    return b ? `${koInt(a)}.${[...b].map((c) => KD[c]).join("")}` : String(koInt(a));
+  });
+}
+function parseSpoken(raw) {
+  let t = koDigits(raw).replace(/(\d),(\d)/g, "$1$2");
+  const out = { systolic: null, diastolic: null, weight: null };
+  const w = t.match(/(?:체중|몸무게|무게)\D{0,4}(\d{2,3}(?:\.\d)?)/) || t.match(/(\d{2,3}(?:\.\d)?)\s*(?:킬로|키로|kg|㎏)/i);
+  if (w) { out.weight = Number(w[1]); t = t.replace(w[0], " "); }
+  t = t.replace(/(?:맥박|심박)\D{0,4}\d{2,3}/g, " ");
+  const n = (t.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+  for (let i = 0; i < n.length - 1; i++) {
+    const [a, b] = [n[i], n[i + 1]];
+    if (Number.isInteger(a) && Number.isInteger(b) && a >= 70 && a <= 260 && b >= 30 && b <= 160 && a > b) {
+      out.systolic = a; out.diastolic = b;
+      if (out.weight == null && n[i + 2] != null && n[i + 2] >= 20 && n[i + 2] <= 200) out.weight = n[i + 2];
+      break;
+    }
+  }
+  return out;
+}
+const SpeechIn = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechIn) $("voiceIn").hidden = true;
+$("voiceIn").addEventListener("click", () => {
+  if (!window.isSecureContext) { inNote("이 주소에서는 마이크를 쓸 수 없어요. 숫자를 눌러 적어 주세요."); return; }
+  const rec = new SpeechIn();
+  rec.lang = "ko-KR"; rec.interimResults = false; rec.maxAlternatives = 3;
+  $("voiceIn").classList.add("on");
+  inNote("🎤 듣고 있어요. 혈압계 숫자를 순서대로 말씀해 주세요.<br>예: <b>\"백이십에 팔십, 체중 육십 점 오\"</b>", true);
+  rec.onresult = (ev) => {
+    const alts = [...ev.results[0]].map((r) => r.transcript.trim());
+    const hit = alts.map((a) => [a, parseSpoken(a)]).find(([, v]) => v.systolic) || [alts[0], parseSpoken(alts[0] || "")];
+    const [heard, v] = hit;
+    if (!v.systolic && v.weight == null) { inNote(`"${escapeHtml(heard)}"(이)라고 들었는데 숫자를 찾지 못했어요. 다시 눌러서 <b>앞 숫자, 뒤 숫자</b> 순서로 말씀해 주세요.`); return; }
+    fillValues(v);
+    inNote(`"${escapeHtml(heard)}"(이)라고 들었어요 → ${v.systolic ? `혈압 <b>${v.systolic}/${v.diastolic}</b>` : ""}${v.weight != null ? ` · 체중 <b>${v.weight}kg</b>` : ""}<br>파란 칸의 숫자가 맞으면 <b>저장</b>을 눌러 주세요.`, true);
+  };
+  rec.onerror = (ev) => inNote({
+    "not-allowed": "마이크 사용이 막혀 있어요. 주소창 왼쪽 자물쇠를 눌러 마이크를 '허용'으로 바꿔 주세요.",
+    "no-speech": "목소리가 들리지 않았어요. 🎤를 누르고 바로 말씀해 주세요.",
+    "audio-capture": "마이크를 찾지 못했어요.",
+    "network": "음성 인식에 인터넷 연결이 필요해요.",
+  }[ev.error] || "말로 입력이 되지 않았어요. 숫자를 눌러 적어 주세요.");
+  rec.onend = () => $("voiceIn").classList.remove("on");
+  try { rec.start(); } catch { $("voiceIn").classList.remove("on"); }
+});
+// 사진: 화면에서 1280px 이하로 줄여 보내고(빠르게), 읽은 값은 칸만 채운다. 저장은 사람이 확인 후.
+$("photoIn").addEventListener("click", () => $("photoFile").click());
+$("photoFile").addEventListener("change", async (e) => {
+  const file = e.target.files[0]; e.target.value = "";
+  if (!file) return;
+  $("photoIn").classList.add("on");
+  inNote("📷 사진 속 숫자를 읽고 있어요… (5초쯤 걸려요)", true);
+  try {
+    const img = await createImageBitmap(file);
+    const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    const res = await fetch(`/donors/${encodeURIComponent(code())}/read-monitor`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: cv.toDataURL("image/jpeg", 0.85) }) });
+    const d = await readJson(res);
+    if (!res.ok) { inNote(`${errText(d)}<br>숫자를 눌러 직접 적어 주세요.`); return; }
+    if (!d.readable) { inNote("숫자를 또렷하게 읽지 못했어요.<br>화면에 불빛이 비치지 않게, 숫자가 크게 나오도록 <b>가까이에서 다시 찍어</b> 주세요."); return; }
+    fillValues(d);
+    inNote(`사진에서 <b>${d.systolic}/${d.diastolic}</b>${d.pulse ? ` (맥박 ${d.pulse})` : ""}을 읽었어요.<br>⚠️ <b>혈압계 화면 숫자와 같은지 꼭 확인</b>하고 저장을 눌러 주세요.`);
+  } catch { inNote("사진을 보내지 못했어요. 숫자를 눌러 직접 적어 주세요."); }
+  finally { $("photoIn").classList.remove("on"); }
+});
+$("openForm").addEventListener("click", () => { $("inNote").hidden = true; });
 
 // ---------- 안내 Agent ----------
 let chat = [];                                   // [{role, content}] 이번 대화 기록 (화면을 닫으면 유지, 공여자 바꾸면 초기화)
@@ -1008,37 +1225,101 @@ $("chatStart").addEventListener("click", startChat);
 
 // ---------- 상담사 연결 ----------
 const TOPIC_ICON = { test: "📅", health: "🩺", mind: "💬" };
-let contact = null;
+let contact = null, slots = [], pickedAt = null, pickedDay = 0, whenMode = "book";
 async function openConsult() {
   $("consultForm").hidden = false; $("consultDone").hidden = true; $("consultMsg").textContent = "";
-  if (!contact) { try { contact = await (await fetch("/guide/contact")).json(); } catch { contact = { topics: {}, phone: "", hours: "" }; } }
-  $("consultCall").innerHTML = contact.phone
-    ? `<a class="call-btn" href="tel:${contact.phone}">📞 이식센터에 바로 전화하기</a><p class="fine" style="margin:-8px 0 12px;text-align:center">${contact.hours}</p>`
-    : "";
+  try { contact = await (await fetch("/guide/contact")).json(); } catch { contact = contact || { topics: {}, phone: "", hours: "", open_now: false }; }
+  renderCallCard();
   $("topicList").innerHTML = Object.entries(contact.topics).map(([k, v], i) =>
     `<label><input type="radio" name="topic" value="${k}" ${i === 0 ? "checked" : ""}> ${TOPIC_ICON[k] || ""} ${v}</label>`).join("");
+  setWhen("book");
+  loadSlots();
   loadConsults();
   if ($("chatDialog").open) $("chatDialog").close();
   $("consultDialog").showModal();
 }
+// 지금 바로 전화: 상담 시간이면 전화 버튼, 아니면 예약 안내
+function renderCallCard() {
+  const c = contact;
+  if (c.open_now) {
+    const btn = c.phone
+      ? `<a class="call-btn" href="tel:${c.phone.replace(/[^0-9+]/g, "")}">📞 지금 바로 전화하기</a>`
+      : `<button type="button" class="call-btn" id="demoCall" style="width:100%;border:none">📞 지금 바로 전화하기</button>`;
+    $("consultCall").innerHTML = `<div class="call-card"><p><b>지금은 상담 시간이에요.</b> 누르면 이식센터로 바로 전화가 걸려요.</p>${btn}
+      <small>${c.hours}${c.phone ? ` · ${c.phone}` : ""}</small></div>`;
+    if (!c.phone) $("demoCall").onclick = () => alertCall();
+  } else {
+    $("consultCall").innerHTML = `<div class="call-card closed"><p><b>지금은 상담 시간이 아니에요.</b><br>아래에서 전화 받을 시간을 예약해 두시면 그 시간에 담당자가 전화를 드려요.</p>
+      <small>${c.hours}</small></div>`;
+  }
+}
+function alertCall() {     // 데모: 실제 병원 번호가 없어 전화를 걸지 않는다
+  $("consultCall").querySelector("small").innerHTML = "<b>데모 사이트라 실제로 전화가 걸리지는 않아요.</b><br>병원 번호(CENTER_PHONE)를 넣으면 이 버튼으로 바로 전화가 걸립니다.";
+}
+function setWhen(mode) {
+  whenMode = mode;
+  document.querySelectorAll("#whenSeg button").forEach((b) => b.classList.toggle("on", b.dataset.when === mode));
+  $("bookBox").hidden = mode !== "book"; $("anyBox").hidden = mode !== "any";
+  $("consultSubmit").textContent = mode === "book" ? (pickedAt ? "이 시간으로 예약하기" : "시간을 먼저 골라 주세요") : "상담 요청 보내기";
+}
+$("whenSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setWhen(b.dataset.when); });
+async function loadSlots() {
+  pickedAt = null; $("pickedLabel").textContent = "";
+  $("timeList").innerHTML = "<span class='fine'>시간표를 불러오는 중…</span>";
+  try { slots = await (await fetch(`/donors/${encodeURIComponent(code())}/consult/slots`)).json(); } catch { slots = []; }
+  pickedDay = Math.max(0, slots.findIndex((d) => d.times.some((t) => !t.taken)));
+  renderSlots();
+}
+function renderSlots() {
+  $("dayList").innerHTML = slots.map((d, i) => `<button type="button" data-day="${i}" class="${i === pickedDay ? "on" : ""}">${d.label}</button>`).join("");
+  const day = slots[pickedDay];
+  $("timeList").innerHTML = day && day.times.length
+    ? day.times.map((t) => `<button type="button" data-at="${t.at}" ${t.taken ? "disabled title='예약됨'" : ""} class="${t.at === pickedAt ? "on" : ""}">${t.time}</button>`).join("")
+    : "<span class='fine'>이 날은 남은 시간이 없어요.</span>";
+  setWhen(whenMode);
+}
+$("dayList").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; pickedDay = +b.dataset.day; renderSlots(); });
+$("timeList").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b || b.disabled) return;
+  pickedAt = b.dataset.at;
+  const day = slots[pickedDay];
+  $("pickedLabel").textContent = `✅ ${day.label} ${b.textContent}에 전화를 드릴게요`;
+  renderSlots();
+});
 async function loadConsults() {
   try {
     const rows = await (await fetch(`/donors/${encodeURIComponent(code())}/consult`)).json();
-    $("consultList").innerHTML = rows.length ? rows.map((r) => `<li class="${r.status === "done" ? "ok" : "warn"}"><div>
-      <b>${r.topic_label} · ${r.status === "done" ? "상담 완료" : "연락 기다리는 중"}</b>
-      <span>${dot(r.created_at.slice(0, 10))} 요청${r.staff_note ? ` · 담당자: ${escapeHtml(r.staff_note)}` : ""}</span></div></li>`).join("")
-      : "<li><div><span>아직 요청이 없어요.</span></div></li>";
+    $("consultList").innerHTML = rows.length ? rows.map((r) => {
+      const open = r.status !== "done";
+      const when = r.callback_label ? `📞 ${r.callback_label} 전화 예약` : `${dot(r.created_at.slice(0, 10))} 요청${r.contact_time && r.contact_time !== "언제든" ? ` · ${r.contact_time} 연락` : ""}`;
+      return `<li class="${open ? "warn" : "ok"}"><div>
+        <b>${r.topic_label} · ${open ? (r.callback_label ? "예약됨" : "연락 기다리는 중") : (r.handled_by === "공여자" ? "취소함" : "상담 완료")}</b>
+        <span>${when}${r.staff_note && r.handled_by !== "공여자" ? ` · 담당자: ${escapeHtml(r.staff_note)}` : ""}</span>
+        ${open ? `<button type="button" class="cancel" data-cancel="${r.request_id}">${r.callback_label ? "예약 취소" : "요청 취소"}</button>` : ""}</div></li>`;
+    }).join("") : "<li><div><span>아직 요청이 없어요.</span></div></li>";
   } catch {}
 }
+$("consultList").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-cancel]"); if (!b) return;
+  if (!confirm("이 상담 요청을 취소할까요?")) return;
+  await fetch(`/donors/${encodeURIComponent(code())}/consult/${b.dataset.cancel}/cancel`, { method: "POST" });
+  loadConsults(); loadSlots();
+});
 $("consultForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
-  const res = await fetch(`/donors/${encodeURIComponent(code())}/consult`, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ topic: f.get("topic"), message: (f.get("message") || "").trim() || null, contact_time: f.get("contact_time") }) });
-  if (!res.ok) { $("consultMsg").textContent = "보내지 못했어요: " + errText(await readJson(res)); return; }
+  if (whenMode === "book" && !pickedAt) { $("consultMsg").textContent = "전화 받을 날짜와 시간을 먼저 눌러 골라 주세요."; return; }
+  const body = { topic: f.get("topic"), message: (f.get("message") || "").trim() || null,
+                 contact_time: whenMode === "book" ? "예약" : f.get("contact_time"),
+                 callback_at: whenMode === "book" ? pickedAt : null };
+  const res = await fetch(`/donors/${encodeURIComponent(code())}/consult`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const d = await readJson(res);
+  if (!res.ok) { $("consultMsg").textContent = "보내지 못했어요: " + errText(d); if (res.status === 409) loadSlots(); return; }
   e.target.reset();
   $("consultForm").hidden = true; $("consultDone").hidden = false;
-  $("consultDone").innerHTML = `<div class="result normal"><b>상담 요청을 보냈어요</b>담당자가 확인하고 ${f.get("contact_time") === "언제든" ? "" : f.get("contact_time") + "에 "}전화를 드릴게요. 보통 1~2 근무일 안에 연락드려요.</div>`;
+  $("consultDone").innerHTML = d.callback_label
+    ? `<div class="result normal"><b>📞 ${d.callback_label}에 전화를 드릴게요</b>그 시간에 담당자가 전화를 드려요. 전화번호가 모르는 번호로 보일 수 있으니 꼭 받아 주세요. 사정이 생기면 아래 목록에서 취소할 수 있어요.</div>`
+    : `<div class="result normal"><b>상담 요청을 보냈어요</b>담당자가 확인하고 ${body.contact_time === "언제든" ? "" : body.contact_time + "에 "}전화를 드릴게요. 보통 1~2 근무일 안에 연락드려요.</div>`;
   loadConsults();
 });
 $("consultStart").addEventListener("click", openConsult);

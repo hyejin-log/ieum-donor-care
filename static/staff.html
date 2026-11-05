@@ -336,7 +336,7 @@ async function loadConsults() {
     $("consultCount").textContent = rows.length ? `· 처리 전 ${rows.length}건` : "· 처리 전 요청 없음";
     $("consultRows").innerHTML = rows.length ? rows.map((r) => `<tr>
       <td><b>${esc(r.donor_code)}</b></td><td>${esc(r.topic_label)}</td>
-      <td style="white-space:pre-wrap">${esc(r.message) || "-"}</td><td>${esc(r.contact_time)}</td>
+      <td style="white-space:pre-wrap">${esc(r.message) || "-"}</td><td>${r.callback_label ? `<b>📞 ${esc(r.callback_label)}</b><br><small>전화 예약</small>` : esc(r.contact_time)}</td>
       <td>${new Date(r.created_at).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
       <td><input id="note-${r.request_id}" placeholder="처리 내용 (공여자에게 보임)" style="margin:0 0 4px;font-size:.8rem">
           <button style="margin:0;padding:4px 10px;font-size:.8rem" onclick="doneConsult(${r.request_id})">완료</button></td></tr>`).join("")
