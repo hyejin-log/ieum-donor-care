@@ -476,6 +476,27 @@ def login(body: LoginIn, request: Request):
         return _login_response(conn, request, user)
 
 
+class DemoIn(BaseModel):
+    role: str
+
+
+@app.post("/auth/demo")
+def demo_login(body: DemoIn, request: Request):
+    """면접관용 '바로 체험하기': 데모 계정 2개에만, 데모 모드(DEMO_RESET=1)일 때만 열린다.
+    자료는 모두 가상이고 매일 새벽 처음 상태로 돌아가므로 비밀번호 없이 들어오게 한다."""
+    if not (demo_reset_on() and os.getenv("DEMO_PASSWORD")):
+        raise HTTPException(status_code=404, detail="체험하기는 데모 사이트에서만 쓸 수 있어요")
+    username = {a[1]: a[0] for a in DEMO_ACCOUNTS}.get(body.role)
+    if username is None:
+        raise HTTPException(status_code=422, detail="role 은 donor 또는 staff 예요")
+    with get_conn() as conn:
+        user = conn.execute("SELECT user_id, role FROM users WHERE username = %s", (username,)).fetchone()
+        if user is None:
+            ensure_demo_accounts(conn, os.getenv("DEMO_PASSWORD"))
+            user = conn.execute("SELECT user_id, role FROM users WHERE username = %s", (username,)).fetchone()
+        return _login_response(conn, request, user)
+
+
 @app.post("/auth/logout")
 def logout(request: Request):
     with get_conn() as conn:

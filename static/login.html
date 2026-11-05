@@ -30,15 +30,47 @@
     small.help { display: block; color: #8792A6; margin: -8px 0 12px; font-size: .76rem; }
     #msg { color: #E06A4F; font-size: .85rem; min-height: 1.2em; margin: 8px 0 0; }
     [hidden] { display: none !important; }
-    .demo-note { background: #FBF1DD; color: #8A5B0A; border-radius: 14px; padding: 10px 14px; font-size: .82rem; margin: -6px 0 16px; }
+    .problem { color: #22304A; font-size: .95rem; line-height: 1.6; margin: 0 0 16px; }
+    .try { background: #fff; border-radius: 22px; padding: 18px; box-shadow: 0 10px 28px rgba(23, 35, 61, .06); margin-bottom: 16px; }
+    .try h2 { font-size: 1.05rem; margin: 0 0 4px; color: #17233D; }
+    .try p { font-size: .8rem; color: #8792A6; margin: 0 0 12px; }
+    .try .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .try .btns button { margin: 0; padding: 14px 8px; border-radius: 16px; font-weight: 700; font-size: .95rem; line-height: 1.35; }
+    .try .btns button small { display: block; font-weight: 500; font-size: .74rem; opacity: .8; }
+    .try .btns .staff { background: #fff; color: #17233D; border: 1.5px solid #17233D; }
+    .feat { list-style: none; padding: 0; margin: 0 0 14px; }
+    .feat li { list-style: none; display: flex; gap: 10px; align-items: flex-start; font-size: .86rem; color: #22304A; margin: 0 0 8px; line-height: 1.5; }
+    .feat li span { font-size: 1.1rem; line-height: 1.3; }
+    .feat b { color: #17233D; }
+    .maker { font-size: .8rem; color: #5B6780; border-top: 1px solid #DDE4EE; padding-top: 12px; margin: 0 0 22px; }
+    .maker a { color: #3F6FE0; font-weight: 700; }
+    .sub { font-size: .82rem; color: #8792A6; margin: 0 0 8px; }
+    .demo-only { background: #F4F7FB; color: #5B6780; border-radius: 12px; padding: 10px 12px; font-size: .8rem; margin: 0 0 12px; }
   </style>
 </head>
 <body>
 <main>
   <div class="logo"><i></i>이음</div>
   <p class="tag">생체 신장 기증 이후의 건강을 끊기지 않게 잇습니다</p>
-  <p class="demo-note">이 사이트의 공여자 · 검사 자료는 모두 <b>가상 데이터</b>입니다 (포트폴리오 시연용).<span id="demoAccounts"></span></p>
+  <p class="problem">신장 기증 후에도 평생 정기 검사가 필요하지만, 시간이 지날수록 검사에서 빠지기 쉽습니다. <b>이음</b>은 공여자와 의료진을 이어 그 공백을 줄입니다.</p>
 
+  <section class="try" id="tryBox" hidden>
+    <h2>바로 체험하기</h2>
+    <p>로그인 없이 들어갑니다 · 자료는 모두 가상 데이터이고 매일 새벽 처음 상태로 돌아갑니다</p>
+    <div class="btns">
+      <button type="button" data-demo="donor">공여자 화면<small>기록 · 검사 설명 · 안내 Agent</small></button>
+      <button type="button" data-demo="staff" class="staff">의료진 화면<small>추적 관리 · EMR · eCRF</small></button>
+    </div>
+  </section>
+
+  <ul class="feat">
+    <li><span>🩺</span><div><b>공여자 앱</b> · 혈압·체중 기록, 검사 결과를 쉬운 말로 설명, 안내 Agent에게 질문</div></li>
+    <li><span>📋</span><div><b>의료진 화면</b> · 추적 검사 일정과 누락 관리, 상담 요청 처리</div></li>
+    <li><span>🔗</span><div><b>병원·연구 연동</b> · FHIR 형식 모의 EMR 자동 수집, REDCap 형식 eCRF 내보내기</div></li>
+  </ul>
+  <p class="maker">임상연구코디네이터(CRC) 경력자가 연구 현장에서 겪은 문제로 만든 포트폴리오입니다 · <a href="https://github.com/hyejin-log/ieum-donor-care" target="_blank" rel="noopener">코드와 설명 보기 (GitHub)</a></p>
+
+  <p class="sub" id="haveAccount">계정이 있다면 로그인하세요</p>
   <article>
     <div class="tabs">
       <button id="tabLogin" class="on">로그인</button>
@@ -52,6 +84,7 @@
     </form>
 
     <form id="signupForm" hidden>
+      <p class="demo-only" id="signupNote" hidden>실제 병원에서는 이식센터가 알려 준 <b>공여자 코드 + 출생 연도</b>(의료진은 병원 가입 코드)가 맞아야 가입됩니다. 본인이 아닌 사람이 남의 기록을 보지 못하게 하기 위한 설계예요. 둘러보시려면 위의 <b>바로 체험하기</b>를 눌러 주세요.</p>
       <div class="roles">
         <label><input type="radio" name="role" value="donor" checked> 공여자</label>
         <label><input type="radio" name="role" value="staff"> 의료진</label>
@@ -86,9 +119,15 @@ function show(tab) {
   $("msg").textContent = "";
 }
 fetch("/guide/demo").then((r) => r.json()).then((d) => {
-  if (d.accounts && d.accounts.length)
-    $("demoAccounts").innerHTML = `<br>데모 계정: <b>${d.accounts.join("</b> · <b>")}</b> (비밀번호는 GitHub README 참고) · 매일 새벽 데모 자료가 처음 상태로 돌아갑니다.`;
+  if (!(d.accounts && d.accounts.length)) return;
+  $("tryBox").hidden = false;
+  $("signupNote").hidden = false;
 }).catch(() => {});
+document.querySelectorAll("[data-demo]").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("[data-demo]").forEach((x) => x.setAttribute("aria-busy", "true"));
+  send("/auth/demo", { role: b.dataset.demo }).finally(() =>
+    document.querySelectorAll("[data-demo]").forEach((x) => x.removeAttribute("aria-busy")));
+});
 $("tabLogin").onclick = () => show("login");
 $("tabSignup").onclick = () => show("signup");
 $("signupForm").addEventListener("change", (e) => {
