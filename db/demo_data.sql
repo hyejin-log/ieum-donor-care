@@ -43,20 +43,32 @@ JOIN (VALUES ('D-001', '기증 후 6개월', 1.02, 88, 'Negative'),
   ON d.donor_code = v.code AND f.visit_name = v.visit_name
 WHERE f.completed_date IS NOT NULL;
 
--- 자가 기록 (같은 결과가 나오도록 random 대신 날짜로 만든 값)
+-- 자가 기록: 사람이 잰 값처럼 날마다 조금씩 들쭉날쭉하게.
+--   random() 대신 hashtext(날짜)로 만든 값이라 다시 넣어도 같은 날짜면 같은 값이 나온다.
+-- D-001: 정상 범위에서 꾸준히 기록, 가끔 하루씩 빠짐 (어제 기록은 항상 있음)
 INSERT INTO home_measurements (donor_id, measured_at, systolic_bp, diastolic_bp, weight_kg)
-SELECT d.donor_id, w::date, 117 + (extract(doy FROM w)::int % 7), 75 + (extract(doy FROM w)::int % 5),
-       59.6 + (extract(doy FROM w)::int % 9) / 10.0
+SELECT d.donor_id, w::date,
+       112 + abs(hashtext('s1' || w::date)) % 11 + abs(hashtext('t1' || w::date)) % 4,
+       71 + abs(hashtext('d1' || w::date)) % 9,
+       59.3 + (abs(hashtext('w1' || w::date)) % 9) / 10.0
 FROM donors d, generate_series(current_date - 83, current_date - 1, interval '1 day') AS w
-WHERE d.donor_code = 'D-001';
+WHERE d.donor_code = 'D-001'
+  AND (abs(hashtext('m1' || w::date)) % 8 <> 0 OR w::date = current_date - 1);
 
+-- D-002: 이틀에 한 번 기록, 혈압이 서서히 올라 집 혈압 기준(135/85) 바로 아래까지 감 (기준은 넘지 않게)
 INSERT INTO home_measurements (donor_id, measured_at, systolic_bp, diastolic_bp, weight_kg)
-SELECT d.donor_id, w::date, 124 + n / 6 + (n % 3), 79 + (n % 4), 73.6 + (n % 8) / 10.0
+SELECT d.donor_id, w::date,
+       120 + n / 5 + abs(hashtext('s2' || w::date)) % 7,
+       77 + n / 10 + abs(hashtext('d2' || w::date)) % 4,
+       73.4 + n / 40.0 + (abs(hashtext('w2' || w::date)) % 7) / 10.0
 FROM donors d, generate_series(current_date - 83, current_date - 2, interval '2 days') WITH ORDINALITY AS g(w, n)
 WHERE d.donor_code = 'D-002';
 
+-- D-003: 일주일에 한 번 기록하다 6주 전부터 끊김 (자가 기록 끊김 경고 사례)
 INSERT INTO home_measurements (donor_id, measured_at, systolic_bp, diastolic_bp, weight_kg)
-SELECT d.donor_id, w::date, 112 + (extract(doy FROM w)::int % 6), 72 + (extract(doy FROM w)::int % 5),
-       54.7 + (extract(doy FROM w)::int % 6) / 10.0
+SELECT d.donor_id, w::date,
+       109 + abs(hashtext('s3' || w::date)) % 10,
+       69 + abs(hashtext('d3' || w::date)) % 8,
+       54.6 + (abs(hashtext('w3' || w::date)) % 8) / 10.0
 FROM donors d, generate_series(current_date - 140, current_date - 42, interval '7 days') AS w
 WHERE d.donor_code = 'D-003';

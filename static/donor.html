@@ -606,7 +606,11 @@ function renderBp(home) {
   $("bpChip").className = `chip ${lv ? lv.cls : ""}`;
   $("bpChip").textContent = lv ? lv.text : "";
   const pt = (k) => recent.map((r) => ({ x: r.measured_at, y: r[k] }));
-  const style = (c) => ({ borderColor: c, backgroundColor: c, borderWidth: 2, tension: 0.4, pointRadius: 3,
+  // 점이 많으면(매일 기록) 동그라미가 겹쳐 사슬처럼 보인다 → 선만 그리고 마지막 기록만 점으로 표시
+  const many = recent.length > 20;
+  const lastOnly = (ctx) => (ctx.dataIndex === recent.length - 1 ? 4 : 0);
+  const style = (c) => ({ borderColor: c, backgroundColor: c, borderWidth: 2, tension: 0.3,
+                          pointRadius: many ? lastOnly : 3, pointHoverRadius: 5, pointHitRadius: 8,
                           pointBackgroundColor: "#fff", pointBorderColor: c, pointBorderWidth: 2 });
   bpChart = new Chart($("bpChart"), {
     type: "line",
@@ -620,9 +624,11 @@ function renderBp(home) {
       scales: {
         x: { type: "time", grid: { display: false }, border: { display: false },
              ticks: { maxTicksLimit: 4, maxRotation: 0 }, time: { unit: "week", displayFormats: { week: "MM.dd" }, tooltipFormat: "yyyy.MM.dd" } },
-        y: { min: 50, max: 180, grid: { color: "#EEF2F7" }, border: { display: false }, ticks: { maxTicksLimit: 4 } },
+        y: { min: 60, max: 180, grid: { color: "#EEF2F7" }, border: { display: false }, ticks: { stepSize: 30 } },
       },
-      plugins: { legend: { align: "end", labels: { boxWidth: 7, boxHeight: 7, usePointStyle: true, filter: (i) => !i.text.startsWith("기준") } } },
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { align: "end", labels: { boxWidth: 7, boxHeight: 7, usePointStyle: true, filter: (i) => !i.text.startsWith("기준") } },
+                 tooltip: { filter: (i) => !i.dataset.label.startsWith("기준") } },
     },
   });
 }
