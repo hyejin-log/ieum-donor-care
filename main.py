@@ -491,7 +491,7 @@ def signup(body: SignupIn, request: Request):
                 raise HTTPException(status_code=409, detail="이 공여자 코드로 이미 가입한 계정이 있어요")
             donor_id = donor["donor_id"]
         elif not auth.staff_invite_ok(body.invite_code or ""):
-            raise HTTPException(status_code=403, detail="의료진 가입 코드가 맞지 않아요 (.env 의 STAFF_INVITE_CODE)")
+            raise HTTPException(status_code=403, detail="의료진 가입 코드가 맞지 않아요. 병원 관리자에게 받은 코드를 확인해 주세요")
         user = conn.execute(
             "INSERT INTO users (username, password_hash, role, display_name, donor_id) "
             "VALUES (%s, %s, %s, %s, %s) RETURNING user_id, role",
