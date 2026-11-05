@@ -150,13 +150,10 @@
     .seg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--soft); border-radius: 16px; padding: 4px; margin: 0 0 12px; }
     .seg2 button { margin: 0; padding: 10px 4px; border-radius: 12px; border: none; background: none; color: var(--muted); font-weight: 800; font-size: .95rem; }
     .seg2 button.on { background: var(--card); color: var(--navy); box-shadow: 0 1px 3px rgba(23,35,61,.12); }
-    /* 근무일 5일을 한 줄에 다 보이게 (옆으로 밀지 않아도 됨) */
-    .days { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 0 0 10px; }
-    .days button { margin: 0; padding: 8px 2px; border-radius: 12px; font-size: .82rem; font-weight: 700; line-height: 1.25;
+    .days { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin: 0 0 10px; }
+    .days button { flex: none; width: auto; margin: 0; padding: 9px 12px; border-radius: 12px; font-size: .9rem; font-weight: 700;
                    background: var(--card); color: var(--navy); border: 1.5px solid var(--line); }
-    .days button small { display: block; font-size: .72rem; font-weight: 600; color: var(--muted); }
     .days button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
-    .days button.on small { color: #C9D6EE; }
     .days button.full { opacity: .45; }
     .times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 12px; }
     .times button { margin: 0; padding: 12px 0; border-radius: 12px; font-size: 1rem; font-weight: 800;
@@ -1290,23 +1287,23 @@ function startSlotSync() {
   slotTimer = setInterval(() => { if ($("consultDialog").open && whenMode === "book") loadSlots(true); else clearInterval(slotTimer); }, 30000);
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden && $("consultDialog").open) loadSlots(true); });
-// 날짜 칸은 '오늘부터 근무일 5일'이라 날이 바뀌면 지난 날은 빠지고 새 날이 뒤에 붙는다 (서버가 오늘 기준으로 만듦).
-// 창을 열어 둔 채 자정·주말이 지나도 1분마다 날짜를 확인해 바로 넘어간다.
-let slotDay = new Date().toDateString();
-setInterval(() => {
-  const d = new Date().toDateString();
-  if (d !== slotDay) { slotDay = d; if ($("consultDialog").open) loadSlots(true); }
-}, 60000);
+// 날짜 칸은 '오늘부터 근무일 5일'이고 자정(00:00)마다 하루씩 넘어간다 (서버가 한국 시간 기준으로 만듦).
+// 창을 열어 둔 채 자정이 지나면 그 순간 시간표를 다시 받아 바로 넘어간다.
+function scheduleMidnight() {
+  const now = new Date(), next = new Date(now);
+  next.setHours(24, 0, 2, 0);                                   // 다음 00:00:02
+  setTimeout(() => { if ($("consultDialog").open) loadSlots(true); scheduleMidnight(); }, next - now);
+}
+scheduleMidnight();
 function renderSlots() {
   $("dayList").innerHTML = slots.map((d, i) => {
     const free = d.times.filter((t) => !t.taken).length;
-    const [, m, dd, wd] = d.label.match(/(\d+)월 (\d+)일 \((.)\)/) || [];     // "11월 9일 (월)" → 11/9 · 월
-    return `<button type="button" data-day="${i}" class="${i === pickedDay ? "on" : ""}${free ? "" : " full"}" aria-label="${d.label}">${m}/${dd}<small>${wd}요일</small></button>`;
+    return `<button type="button" data-day="${i}" class="${i === pickedDay ? "on" : ""}${free ? "" : " full"}">${d.label}</button>`;
   }).join("");
   const day = slots[pickedDay];
   $("timeList").innerHTML = day && day.times.length
     ? day.times.map((t) => `<button type="button" data-at="${t.at}" ${t.taken ? "disabled title='예약됨'" : ""} class="${t.at === pickedAt ? "on" : ""}">${t.time}</button>`).join("")
-    : "<span class='fine'>이 날은 남은 시간이 없어요. 다른 날을 골라 주세요.</span>";
+    : `<span class='fine'>${pickedDay === 0 && day && day.date === slots[0].date && new Date().getHours() >= 16 ? "오늘 상담 시간이 끝났어요. 다른 날을 골라 주세요." : "이 날은 남은 시간이 없어요. 다른 날을 골라 주세요."}</span>`;
   setWhen(whenMode);
 }
 $("dayList").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; pickedDay = +b.dataset.day; renderSlots(); });

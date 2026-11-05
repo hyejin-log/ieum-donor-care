@@ -2,7 +2,8 @@
 상담 전화 예약 시간표. DB를 보지 않는 순수 함수만 둔다 (테스트하기 쉽게).
 
 - 상담 시간: 평일 09:00 ~ 17:00, 점심(12:00 ~ 13:00) 제외, 30분 단위
-- 오늘부터 근무일 5일까지 보여 준다. 지금부터 30분 안의 시간은 고를 수 없다(담당자가 준비할 시간).
+- 오늘부터 근무일 5일까지 보여 준다. 날짜 목록은 자정(00:00 KST)에 하루씩 넘어간다.
+- 지금부터 30분 안의 시간은 고를 수 없다(담당자가 준비할 시간).
 - 한국은 서머타임이 없어 +09:00 고정으로 계산한다 (서버리스 환경에 시간대 자료가 없어도 동작).
 - 공휴일은 반영하지 않는다: 실제 병원에 쓰면 병원 휴무일 표를 받아 빼야 한다.
 """
@@ -46,12 +47,10 @@ def slot_table(now: datetime, taken: set[datetime]) -> list[dict]:
             times = [{"at": t.isoformat(), "time": t.strftime("%H:%M"),
                       "taken": t.astimezone(timezone.utc) in taken_utc}
                      for t in day_times(d) if t >= earliest]
-            if times:
-                days.append({"date": d.isoformat(),
-                             "label": f"{d.month}월 {d.day}일 ({WEEKDAY_KO[d.weekday()]})",
-                             "times": times})
-            elif d != k.date():
-                days.append({"date": d.isoformat(), "label": f"{d.month}월 {d.day}일 ({WEEKDAY_KO[d.weekday()]})", "times": []})
+            # 날짜 목록은 자정(00:00)에만 바뀐다: 오늘 상담 시간이 다 지나도 오늘 칸은 자정까지 남겨 둔다
+            days.append({"date": d.isoformat(),
+                         "label": f"{d.month}월 {d.day}일 ({WEEKDAY_KO[d.weekday()]})",
+                         "times": times})
         d += timedelta(days=1)
     return days
 
