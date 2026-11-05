@@ -70,12 +70,12 @@
     .hero { grid-area: hero; } .egfr { grid-area: egfr; } .bp { grid-area: bp; } .side { grid-area: side; }
 
     /* 히어로: 신장 그림 */
-    .hero { display: flex; flex-direction: column; justify-content: center; gap: clamp(14px, 4vh, 36px); position: relative; overflow: hidden;
+    .hero { display: flex; flex-direction: column; justify-content: space-between; gap: clamp(10px, 1.6vh, 36px); position: relative; overflow: hidden;
             background: linear-gradient(135deg, #2F5BD0 0%, #5A86EE 100%); color: #fff; }
     .hero .label { color: rgba(255, 255, 255, .78); }
-    .next-main .dday { font-size: clamp(2.6rem, 8vh, 4.2rem); font-weight: 800; line-height: 1.05; margin: 6px 0 4px; letter-spacing: -.01em; }
+    .next-main .dday { font-size: clamp(2.4rem, 6.5vh, 4.2rem); font-weight: 800; line-height: 1.05; margin: 6px 0 4px; letter-spacing: -.01em; }
     .next-main .sub { font-size: .95rem; color: rgba(255, 255, 255, .85); }
-    .next-main .flag { margin-top: 12px; background: rgba(255, 255, 255, .16); border-radius: 12px; padding: 9px 12px; font-size: .85rem; display: flex; gap: 8px; align-items: center; }
+    .next-main .flag { margin-top: 8px; background: rgba(255, 255, 255, .16); border-radius: 12px; padding: 9px 12px; font-size: .85rem; display: flex; gap: 8px; align-items: center; }
     .next-main .flag::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #FFC2B2; flex: none; }
     .next-main .flag.amber::before { background: #FFE19C; }
     .next-main .flag:empty { display: none; }
@@ -273,7 +273,6 @@
         <div class="big" id="bp">-</div>
       </div>
       <div class="chart-box"><canvas id="bpChart"></canvas></div>
-      <p class="key"><b>점선(135/85) 아래에 머무는지</b>를 보세요. 하루 높은 건 괜찮아요. <b>며칠 계속 점선 위</b>라면 이식센터에 알려 주세요.</p>
     </article>
 
     <!-- 사이드 -->
@@ -644,7 +643,8 @@ function renderBp(rows) {
   if (bpChart) bpChart.destroy();
   const lastBp = [...rows].reverse().find((r) => r.systolic_bp != null);
   $("bp").textContent = lastBp ? `${lastBp.systolic_bp}/${lastBp.diastolic_bp ?? "-"}` : "-";
-  $("bpSub").textContent = lastBp ? `최근 ${dot(lastBp.measured_at)} · mmHg` : "기록 없음";
+  // 그래프 공간을 아끼려고 핵심 안내를 제목 아래 한 줄에 둔다 (자세한 설명은 '무엇을 봐야 해요?')
+  $("bpSub").innerHTML = (lastBp ? `최근 ${dot(lastBp.measured_at)} · ` : "") + `<b style="color:var(--ink)">점선(135/85) 아래</b>면 좋아요 · 며칠 계속 위면 연락`;
   const point = (key) => rows.map((r) => ({ x: r.measured_at, y: r[key] }));
   // 점이 많으면(매일 기록) 동그라미가 겹쳐 보이므로 선만 그리고 마지막 기록만 점으로
   const many = rows.length > 20;
