@@ -29,12 +29,14 @@
     small.help { display: block; color: #8792A6; margin: -8px 0 12px; font-size: .76rem; }
     #msg { color: #E06A4F; font-size: .85rem; min-height: 1.2em; margin: 8px 0 0; }
     [hidden] { display: none !important; }
+    .demo-note { background: #FBF1DD; color: #8A5B0A; border-radius: 14px; padding: 10px 14px; font-size: .82rem; margin: -6px 0 16px; }
   </style>
 </head>
 <body>
 <main>
   <div class="logo"><i></i>이음</div>
   <p class="tag">생체 신장 기증 이후의 건강을 끊기지 않게 잇습니다</p>
+  <p class="demo-note">이 사이트의 공여자 · 검사 자료는 모두 <b>가상 데이터</b>입니다 (포트폴리오 시연용).<span id="demoAccounts"></span></p>
 
   <article>
     <div class="tabs">
@@ -82,6 +84,10 @@ function show(tab) {
   $("signupForm").hidden = tab !== "signup";
   $("msg").textContent = "";
 }
+fetch("/guide/demo").then((r) => r.json()).then((d) => {
+  if (d.accounts && d.accounts.length)
+    $("demoAccounts").innerHTML = `<br>데모 계정: <b>${d.accounts.join("</b> · <b>")}</b> (비밀번호는 GitHub README 참고) · 매일 새벽 데모 자료가 처음 상태로 돌아갑니다.`;
+}).catch(() => {});
 $("tabLogin").onclick = () => show("login");
 $("tabSignup").onclick = () => show("signup");
 $("signupForm").addEventListener("change", (e) => {

@@ -1,4 +1,5 @@
 import io
+from pathlib import Path
 import json
 import os
 from datetime import date, timedelta
@@ -101,8 +102,15 @@ def bp_assess(sys_: int | None, dia: int | None) -> dict:
             "advice": f"가정혈압 기준({BP_HOME_SYS}/{BP_HOME_DIA} 미만) 안에 있어요. 내일도 같은 시간에 재 주세요."}
 
 
+BASE_DIR = Path(__file__).parent               # 어디서 실행해도(서버리스 포함) 파일을 찾도록 기준 폴더
+
+
 def get_conn():
-    """데이터베이스에 접속한다. 결과는 {칸 이름: 값} 형태로 받는다."""
+    """데이터베이스에 접속한다. 결과는 {칸 이름: 값} 형태로 받는다.
+    배포(Neon 등)에서는 DATABASE_URL 한 줄, 내 PC에서는 DB_HOST · DB_PORT … 를 쓴다."""
+    url = os.getenv("DATABASE_URL")
+    if url:
+        return psycopg.connect(url, row_factory=dict_row)
     return psycopg.connect(
         host=os.getenv("DB_HOST"),
         port=os.getenv("DB_PORT"),
@@ -126,14 +134,84 @@ def get_donor(conn, donor_code: str) -> dict:
 
 # ---------- 로그인 확인 ----------
 
+
+
+CARE_SQL = """
+CREATE TABLE IF NOT EXISTS chat_messages (
+    message_id  SERIAL PRIMARY KEY,
+    donor_id    INTEGER NOT NULL REFERENCES donors(donor_id),
+    role        TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content     TEXT NOT NULL,
+    mode        TEXT,
+    created_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS chat_messages_donor ON chat_messages (donor_id, created_at);
+CREATE TABLE IF NOT EXISTS consult_requests (
+    request_id    SERIAL PRIMARY KEY,
+    donor_id      INTEGER NOT NULL REFERENCES donors(donor_id),
+    topic         TEXT NOT NULL,
+    message       TEXT,
+    contact_time  TEXT,
+    status        TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'done')),
+    staff_note    TEXT,
+    handled_by    TEXT,
+    created_at    TIMESTAMPTZ DEFAULT now(),
+    handled_at    TIMESTAMPTZ
+);
+"""
+
+
+def demo_reset_on() -> bool:
+    return os.getenv("DEMO_RESET") == "1"
+
+
+def load_demo_data(conn) -> None:
+    """데모 데이터를 오늘 날짜 기준으로 다시 넣는다 (계정은 그대로)."""
+    conn.execute((BASE_DIR / "db" / "demo_data.sql").read_text(encoding="utf-8"))
+
+
+DEMO_ACCOUNTS = [("demo_donor", "donor", "데모 공여자", "D-001"), ("demo_staff", "staff", "데모 연구원", None)]
+
+
+def ensure_demo_accounts(conn, password: str) -> None:
+    """면접관이 바로 써 볼 수 있는 데모 계정 (없을 때만 만든다). 비밀번호는 DEMO_PASSWORD."""
+    for username, role, name, code in DEMO_ACCOUNTS:
+        if conn.execute("SELECT 1 FROM users WHERE username = %s", (username,)).fetchone():
+            continue
+        donor_id = None
+        if code:
+            row = conn.execute("SELECT donor_id FROM donors WHERE donor_code = %s", (code,)).fetchone()
+            if row is None or conn.execute("SELECT 1 FROM users WHERE donor_id = %s", (row["donor_id"],)).fetchone():
+                continue
+            donor_id = row["donor_id"]
+        conn.execute("INSERT INTO users (username, password_hash, role, display_name, donor_id) VALUES (%s, %s, %s, %s, %s)",
+                     (username, auth.hash_password(password), role, name, donor_id))
+
+
+@app.get("/guide/demo")
+def demo_info():
+    """로그인 화면 안내: 데모 사이트면 데모 계정 아이디를 알려 준다 (비밀번호는 README에)."""
+    on = demo_reset_on()
+    return {"demo": on, "accounts": [u for u, *_ in DEMO_ACCOUNTS] if on and os.getenv("DEMO_PASSWORD") else []}
+
+
 @app.on_event("startup")
-def create_auth_tables():
-    """users · sessions 테이블이 없으면 만든다 (migrate_auth.sql 과 같은 내용)."""
+def prepare_database():
+    """
+    테이블이 없으면 만든다: 기본 4개 → 로그인 → 대화·상담 순서 (뒤의 테이블이 앞 테이블을 참조).
+    배포용 데모(DEMO_RESET=1)에서 공여자가 하나도 없으면 데모 데이터도 넣는다.
+    """
     try:
         with get_conn() as conn:
+            conn.execute((BASE_DIR / "db" / "schema_all.sql").read_text(encoding="utf-8"))
             conn.execute(auth.AUTH_SQL)
+            conn.execute(CARE_SQL)
+            if demo_reset_on() and conn.execute("SELECT count(*) AS n FROM donors").fetchone()["n"] == 0:
+                load_demo_data(conn)
+            if demo_reset_on() and os.getenv("DEMO_PASSWORD"):
+                ensure_demo_accounts(conn, os.getenv("DEMO_PASSWORD"))
     except Exception as e:                       # DB가 아직 준비되지 않아도 서버는 뜨게 한다
-        print("auth 테이블 준비 실패:", type(e).__name__)
+        print("DB 준비 실패:", type(e).__name__, e)
 
 
 def current_user(request: Request) -> dict:
@@ -287,7 +365,7 @@ def donor_page(request: Request):
     """공여자용 화면 (로그인 필요)"""
     if page_user(request) is None:
         return RedirectResponse("/login")
-    return FileResponse("static/donor.html")
+    return FileResponse(BASE_DIR / "static/donor.html")
 
 
 @app.get("/staff")
@@ -296,7 +374,7 @@ def staff_page(request: Request):
     u = page_user(request)
     if u is None or u["role"] != "staff":
         return RedirectResponse("/login")
-    return FileResponse("static/staff.html")
+    return FileResponse(BASE_DIR / "static/staff.html")
 
 
 @app.get("/dashboard")
@@ -305,12 +383,12 @@ def dashboard_page(request: Request):
     u = page_user(request)
     if u is None or u["role"] != "staff":
         return RedirectResponse("/login")
-    return FileResponse("static/dashboard.html")
+    return FileResponse(BASE_DIR / "static/dashboard.html")
 
 
 @app.get("/login")
 def login_page():
-    return FileResponse("static/login.html")
+    return FileResponse(BASE_DIR / "static/login.html")
 
 
 # ---------- 로그인 · 회원가입 ----------
@@ -375,13 +453,14 @@ def signup(body: SignupIn, request: Request):
 
 @app.post("/auth/login")
 def login(body: LoginIn, request: Request):
-    auth.check_rate(body.username)
     with get_conn() as conn:
+        auth.check_rate(conn, body.username)
         user = conn.execute(
             "SELECT user_id, role, password_hash FROM users WHERE username = %s", (body.username,)
         ).fetchone()
         if user is None or not auth.verify_password(body.password, user["password_hash"]):
-            auth.record_fail(body.username)
+            auth.record_fail(conn, body.username)
+            conn.commit()                                # 401을 보내기 전에 실패 기록을 확정한다
             raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 맞지 않아요")
         return _login_response(conn, request, user)
 
@@ -411,7 +490,9 @@ def _key_check(key: str | None) -> dict | None:
 
 @app.get("/health")
 def health():
-    """서버가 살아 있는지 확인"""
+    """서버가 살아 있는지 확인. 배포 환경에서는 키 정보 등은 보여 주지 않는다."""
+    if os.getenv("VERCEL"):
+        return {"status": "ok", "llm_provider": agent.LLM_PROVIDER}
     return {"status": "ok", "llm_provider": agent.LLM_PROVIDER,
             "llm_model": agent.GROQ_MODEL if agent.LLM_PROVIDER == "groq" else agent.OLLAMA_MODEL,
             "groq_key_set": bool(os.getenv("GROQ_API_KEY")),          # 키 값은 보여주지 않는다
@@ -419,7 +500,7 @@ def health():
             "llm_last_error": agent.LAST_LLM_ERROR}
 
 
-@app.get("/health/groq-models")
+@app.get("/health/groq-models", dependencies=[Depends(staff_only)])
 def groq_model_list():
     """이 키로 쓸 수 있는 Groq 모델 목록 (모델 이름만)"""
     try:
@@ -619,8 +700,10 @@ def create_lab(lab: LabIn, user: dict = Depends(staff_only)):
 @app.get("/mock-emr/fhir/Observation")
 def mock_emr_observations(request: Request):
     """모의 EMR의 FHIR 검색 API. 예: ?patient.identifier=urn:ieum:donor-code|D-001 (가상 자료)"""
-    ident = request.query_params.get("patient.identifier", "")
-    return emr.mock_bundle(ident.split("|")[-1])
+    code = request.query_params.get("patient.identifier", "").split("|")[-1]
+    with get_conn() as conn:                              # 모의 EMR은 기증일을 기준으로 가상 결과를 만든다
+        row = conn.execute("SELECT donation_date FROM donors WHERE donor_code = %s", (code,)).fetchone()
+    return emr.mock_bundle(code, row["donation_date"] if row else None)
 
 
 def sync_emr(donor_code: str | None = None) -> list[dict]:
@@ -632,9 +715,11 @@ def sync_emr(donor_code: str | None = None) -> list[dict]:
     for code in codes:
         item = {"donor_code": code, "new": 0, "updated": 0, "same": 0, "completed_visits": [], "problems": []}
         try:
-            rows, item["problems"] = emr.parse_bundle(emr.fetch_bundle(code))
             with get_conn() as conn:                     # 공여자 한 명 단위로 저장 (중간에 실패해도 앞 사람은 유지)
                 donor = get_donor(conn, code)
+                when = conn.execute("SELECT donation_date FROM donors WHERE donor_id = %s",
+                                    (donor["donor_id"],)).fetchone()["donation_date"]
+                rows, item["problems"] = emr.parse_bundle(emr.fetch_bundle(code, when))
                 for r in rows:
                     res = save_lab(conn, donor, r["tested_at"], r["creatinine"], r["egfr"], r["urine_protein"],
                                    "EMR 자동(FHIR)")
@@ -781,6 +866,42 @@ def chat_tools(donor_code: str) -> dict:
     }
 
 
+def save_chat(donor_code: str, question: str, reply: str, mode: str | None) -> None:
+    """질문과 답을 대화 기록에 남긴다. 기록 저장이 실패해도 답변은 그대로 보낸다."""
+    try:
+        with get_conn() as conn:
+            donor = get_donor(conn, donor_code)
+            conn.execute(
+                "INSERT INTO chat_messages (donor_id, role, content, mode) VALUES (%s, 'user', %s, NULL), (%s, 'assistant', %s, %s)",
+                (donor["donor_id"], question, donor["donor_id"], reply, mode),
+            )
+    except Exception as e:
+        print("대화 기록 저장 실패:", type(e).__name__)
+
+
+@app.get("/donors/{donor_code}/chat/history", dependencies=[Depends(donor_access)])
+def chat_history(donor_code: str, limit: int = 40):
+    """최근 대화 기록 (오래된 것 → 최근 순). 공여자 본인과 의료진만 볼 수 있다."""
+    limit = max(1, min(limit, 200))
+    with get_conn() as conn:
+        donor = get_donor(conn, donor_code)
+        rows = conn.execute(
+            "SELECT role, content, mode, created_at FROM chat_messages WHERE donor_id = %s "
+            "ORDER BY created_at DESC, message_id DESC LIMIT %s",
+            (donor["donor_id"], limit),
+        ).fetchall()
+    return list(reversed(rows))
+
+
+@app.delete("/donors/{donor_code}/chat/history", dependencies=[Depends(donor_access)])
+def clear_chat_history(donor_code: str):
+    """공여자가 자기 대화 기록을 지운다."""
+    with get_conn() as conn:
+        donor = get_donor(conn, donor_code)
+        n = conn.execute("DELETE FROM chat_messages WHERE donor_id = %s", (donor["donor_id"],)).rowcount
+    return {"deleted": n}
+
+
 @app.post("/donors/{donor_code}/chat", dependencies=[Depends(donor_access)])
 def donor_chat(donor_code: str, chat: ChatIn):
     """공여자 질문에 안내 Agent가 답한다. 도구는 이 공여자의 기록만 조회하도록 고정한다."""
@@ -792,6 +913,7 @@ def donor_chat(donor_code: str, chat: ChatIn):
     impl = chat_tools(donor_code)
     result = agent.run_agent([m.model_dump() for m in chat.messages], impl)
     result["disclaimer"] = agent.DISCLAIMER
+    save_chat(donor_code, chat.messages[-1].content, result.get("reply", ""), result.get("mode"))
     return result
 
 
@@ -806,8 +928,17 @@ def donor_chat_stream(donor_code: str, chat: ChatIn):
     messages = [m.model_dump() for m in chat.messages]
 
     def lines():
+        text, mode = "", None
         for event in agent.run_agent_stream(messages, impl):
+            if event.get("type") == "meta":
+                mode = event.get("mode")
+            elif event.get("type") == "delta":
+                text += event.get("text", "")
+            elif event.get("type") == "replace":
+                text, mode = event.get("text", ""), event.get("mode", mode)
             yield json.dumps(event, ensure_ascii=False, default=str) + "\n"
+        if text:                                          # 답을 다 보낸 뒤 기록에 남긴다
+            save_chat(donor_code, messages[-1]["content"], text, mode)
 
     return StreamingResponse(lines(), media_type="application/x-ndjson")
 
@@ -818,6 +949,121 @@ def agent_warmup(donor_code: str):
     with get_conn() as conn:
         get_donor(conn, donor_code)
     return {"ready": agent.warm_up(chat_tools(donor_code))}
+
+
+# ---------- 상담사 연결 ----------
+# 실시간 상담은 사람이 대기해야 하므로, 데모에서는 '상담 요청 → 담당자가 전화' 방식으로 만든다.
+CONSULT_TOPICS = {
+    "test": "검사 · 일정 (이식 코디네이터)",
+    "health": "몸 상태 · 약 (이식 코디네이터 · 간호사)",
+    "mind": "마음 · 생활 (사회복지사 · 심리 상담)",
+}
+
+
+@app.get("/guide/contact")
+def contact_info():
+    """이식센터 연락처 (.env 의 CENTER_PHONE · CENTER_HOURS, 없으면 데모 안내)"""
+    return {"phone": os.getenv("CENTER_PHONE") or "", "hours": os.getenv("CENTER_HOURS") or "평일 09:00 ~ 17:00",
+            "topics": CONSULT_TOPICS}
+
+
+class ConsultIn(BaseModel):
+    topic: Literal["test", "health", "mind"]
+    message: str | None = Field(None, max_length=500)
+    contact_time: Literal["오전", "오후", "언제든"] = "언제든"
+
+
+@app.post("/donors/{donor_code}/consult", dependencies=[Depends(donor_access)])
+def create_consult(donor_code: str, body: ConsultIn):
+    """공여자가 상담을 요청한다. 같은 주제로 처리되지 않은 요청이 있으면 새로 만들지 않고 내용을 덧붙인다."""
+    with get_conn() as conn:
+        donor = get_donor(conn, donor_code)
+        open_req = conn.execute(
+            "SELECT request_id FROM consult_requests WHERE donor_id = %s AND topic = %s AND status = 'new'",
+            (donor["donor_id"], body.topic),
+        ).fetchone()
+        if open_req:
+            conn.execute(
+                "UPDATE consult_requests SET message = concat_ws(E'\\n', message, %s::text), contact_time = %s, created_at = now() "
+                "WHERE request_id = %s",
+                (body.message, body.contact_time, open_req["request_id"]),
+            )
+            return {"request_id": open_req["request_id"], "updated": True}
+        row = conn.execute(
+            "INSERT INTO consult_requests (donor_id, topic, message, contact_time) VALUES (%s, %s, %s, %s) RETURNING request_id",
+            (donor["donor_id"], body.topic, body.message, body.contact_time),
+        ).fetchone()
+    return {"request_id": row["request_id"], "updated": False}
+
+
+@app.get("/donors/{donor_code}/consult", dependencies=[Depends(donor_access)])
+def list_my_consults(donor_code: str):
+    """내 상담 요청과 처리 상태 (최근 10건)"""
+    with get_conn() as conn:
+        donor = get_donor(conn, donor_code)
+        rows = conn.execute(
+            "SELECT request_id, topic, message, contact_time, status, staff_note, created_at, handled_at "
+            "FROM consult_requests WHERE donor_id = %s ORDER BY created_at DESC LIMIT 10",
+            (donor["donor_id"],),
+        ).fetchall()
+    for r in rows:
+        r["topic_label"] = CONSULT_TOPICS.get(r["topic"], r["topic"])
+    return rows
+
+
+@app.get("/staff/consults", dependencies=[Depends(staff_only)])
+def staff_consults(status: Literal["new", "done", "all"] = "new"):
+    """의료진: 상담 요청 목록. 처리 전 요청이 먼저, 오래 기다린 순으로."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT c.request_id, d.donor_code, c.topic, c.message, c.contact_time, c.status, c.staff_note, "
+            "c.handled_by, c.created_at, c.handled_at FROM consult_requests c JOIN donors d ON d.donor_id = c.donor_id "
+            "WHERE %s::text = 'all' OR c.status = %s::text ORDER BY (c.status = 'done'), c.created_at LIMIT 100",
+            (status, status),
+        ).fetchall()
+    for r in rows:
+        r["topic_label"] = CONSULT_TOPICS.get(r["topic"], r["topic"])
+    return rows
+
+
+class ConsultDoneIn(BaseModel):
+    note: str | None = Field(None, max_length=500)
+
+
+@app.post("/staff/consults/{request_id}/done")
+def finish_consult(request_id: int, body: ConsultDoneIn, user: dict = Depends(staff_only)):
+    """의료진: 상담 완료 처리. 누가 언제 처리했는지 남긴다."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "UPDATE consult_requests SET status = 'done', staff_note = %s, handled_by = %s, handled_at = now() "
+            "WHERE request_id = %s RETURNING request_id",
+            (body.note, user["display_name"], request_id),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="상담 요청을 찾을 수 없습니다")
+    return {"ok": True}
+
+
+# ---------- 매일 자동 작업 (Vercel Cron) ----------
+
+@app.get("/cron/daily")
+def cron_daily(request: Request):
+    """
+    Vercel Cron 이 하루 한 번 부른다. 머리글 Authorization: Bearer <CRON_SECRET> 가 맞을 때만 실행.
+    1) 데모 초기화(DEMO_RESET=1): 시연하며 바뀐 기록을 오늘 날짜 기준 데모로 되돌림
+    2) EMR(FHIR) 검사 결과 가져오기
+    """
+    secret = os.getenv("CRON_SECRET")
+    if not secret or request.headers.get("authorization") != f"Bearer {secret}":
+        raise HTTPException(status_code=401, detail="unauthorized")
+    done = {}
+    if demo_reset_on():
+        with get_conn() as conn:
+            load_demo_data(conn)
+        done["demo_reset"] = True
+    else:
+        done["emr"] = sync_emr()                 # 데모 초기화 때는 EMR 결과를 일부러 남겨 두지 않는다(시연용)
+    return done
 
 
 # ---------- 의료진: 전체 공여자 현황 ----------

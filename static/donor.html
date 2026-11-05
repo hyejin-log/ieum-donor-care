@@ -114,6 +114,18 @@
     .ask-list .ic { font-size: 1.25rem; flex: none; }
     .ask-list i { margin-left: auto; font-style: normal; color: var(--blue); font-size: 1.4rem; line-height: 1; }
     .ask-card .ask-note { font-size: .85rem; color: var(--muted); margin: 8px 0 0; text-align: center; }
+    .chat-tools { display: flex; justify-content: space-between; margin: -4px 0 8px; }
+    .chat-tools .link-btn { font-size: .9rem; }
+    .chat-divider { align-self: center; font-size: .75rem; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 3px 12px; margin: 4px 0; }
+    .consult-start { margin: 8px 0 0; width: 100%; border-radius: 16px; font-weight: 800; font-size: 1.05rem; padding: 14px;
+                     background: var(--card); color: var(--navy); border: 2px solid var(--blue-soft); }
+    .topic-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .topic-list label { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px;
+                        font-size: 1rem; font-weight: 700; color: var(--navy); cursor: pointer; margin: 0; }
+    .topic-list label:has(input:checked) { border-color: var(--blue); background: var(--blue-soft); }
+    .topic-list input { margin: 0; }
+    .call-btn { display: block; text-align: center; margin: 0 0 14px; padding: 14px; border-radius: 16px; background: var(--ok); color: #fff;
+                font-weight: 800; font-size: 1.05rem; text-decoration: none; }
     .chat-hint { font-size: .85rem; color: var(--muted); margin: 0 0 4px; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chips button { margin: 0; width: auto; padding: 7px 12px; font-size: .78rem; border-radius: 999px;
@@ -316,6 +328,7 @@
       <button data-q="진통제 먹어도 돼요?"><span class="ic">💊</span>진통제 먹어도 돼요?<i>›</i></button>
     </div>
     <button class="chat-start" id="chatStart">✏️ 다른 것 직접 물어보기</button>
+    <button class="consult-start" id="consultStart">👩‍⚕️ 상담사와 연결하기</button>
     <p class="ask-note">글자로 적거나, 🎤 버튼을 눌러 말로 물어볼 수 있어요.</p>
   </article>
 
@@ -393,6 +406,10 @@
       <button aria-label="닫기" rel="prev" id="closeChat"></button>
       <strong>이음 안내에게 물어보기</strong>
     </header>
+    <div class="chat-tools">
+      <button class="link-btn" id="chatToConsult">👩‍⚕️ 상담사와 연결</button>
+      <button class="link-btn" id="clearChat" style="color:var(--muted)">대화 기록 지우기</button>
+    </div>
     <p class="chat-hint">누르면 바로 물어봐요 →</p>
     <div class="chat-chips" id="chatChips">
       <button>다음 검사는 언제예요?</button>
@@ -410,6 +427,31 @@
       <button type="submit">보내기</button>
     </form>
     <p class="chat-note">참고용 안내이며 진료를 대신하지 않아요. 응급 상황에는 119에 연락하세요.</p>
+  </article>
+</dialog>
+
+<!-- 상담사 연결 -->
+<dialog id="consultDialog">
+  <article>
+    <header>
+      <button aria-label="닫기" rel="prev" id="closeConsult"></button>
+      <strong>상담사와 연결하기</strong>
+    </header>
+    <div id="consultCall"></div>
+    <form id="consultForm">
+      <p class="note" style="margin:0 0 8px"><b>무엇을 상담하고 싶으세요?</b> 남겨 주시면 담당자가 전화를 드려요.</p>
+      <div class="topic-list" id="topicList"></div>
+      <label>하고 싶은 말 (선택)<textarea name="message" rows="3" maxlength="500" placeholder="예: 다음 검사 날짜를 바꾸고 싶어요"></textarea></label>
+      <label>전화 받기 편한 시간
+        <select name="contact_time"><option>언제든</option><option>오전</option><option>오후</option></select>
+      </label>
+      <button type="submit">상담 요청 보내기</button>
+      <p id="consultMsg"></p>
+    </form>
+    <div id="consultDone" hidden></div>
+    <h4 class="sub">내 상담 요청</h4>
+    <ul class="noti-list" id="consultList"></ul>
+    <p class="fine">가슴 통증 · 숨참 같은 응급 상황은 상담 요청 대신 바로 119에 연락하세요.</p>
   </article>
 </dialog>
 
@@ -838,7 +880,7 @@ function addMsg(role, text, mode) {
 }
 
 async function ask(question) {
-  if (!$("chatDialog").open) openChat();
+  if (!$("chatDialog").open) await openChat();
   if (!chat.length && !$("chatLog").children.length)
     addMsg("bot", `안녕하세요, ${displayName || code()}님. 기록과 일정, 기증 후 생활에 대해 물어보세요.`);
   addMsg("user", question);
@@ -922,13 +964,52 @@ if (Speech) {
 }
 $("chatChips").addEventListener("click", (e) => { if (e.target.tagName === "BUTTON") ask(e.target.textContent); });
 // 질문을 고르지 않고 바로 채팅 창 열기
-function startChat() {
-  openChat();
+async function startChat() {
+  await openChat();
   if (!$("chatLog").children.length)
     addMsg("bot", `안녕하세요. 위의 질문을 누르시거나, 아래 칸에 궁금한 것을 적어 주세요.${Speech ? " 🎤 버튼을 누르면 말로 물어볼 수 있어요." : ""}`);
   setTimeout(() => $("chatForm").q.focus(), 50);
 }
 $("chatStart").addEventListener("click", startChat);
+
+// ---------- 상담사 연결 ----------
+const TOPIC_ICON = { test: "📅", health: "🩺", mind: "💬" };
+let contact = null;
+async function openConsult() {
+  $("consultForm").hidden = false; $("consultDone").hidden = true; $("consultMsg").textContent = "";
+  if (!contact) { try { contact = await (await fetch("/guide/contact")).json(); } catch { contact = { topics: {}, phone: "", hours: "" }; } }
+  $("consultCall").innerHTML = contact.phone
+    ? `<a class="call-btn" href="tel:${contact.phone}">📞 이식센터에 바로 전화하기</a><p class="fine" style="margin:-8px 0 12px;text-align:center">${contact.hours}</p>`
+    : "";
+  $("topicList").innerHTML = Object.entries(contact.topics).map(([k, v], i) =>
+    `<label><input type="radio" name="topic" value="${k}" ${i === 0 ? "checked" : ""}> ${TOPIC_ICON[k] || ""} ${v}</label>`).join("");
+  loadConsults();
+  if ($("chatDialog").open) $("chatDialog").close();
+  $("consultDialog").showModal();
+}
+async function loadConsults() {
+  try {
+    const rows = await (await fetch(`/donors/${encodeURIComponent(code())}/consult`)).json();
+    $("consultList").innerHTML = rows.length ? rows.map((r) => `<li class="${r.status === "done" ? "ok" : "warn"}"><div>
+      <b>${r.topic_label} · ${r.status === "done" ? "상담 완료" : "연락 기다리는 중"}</b>
+      <span>${dot(r.created_at.slice(0, 10))} 요청${r.staff_note ? ` · 담당자: ${escapeHtml(r.staff_note)}` : ""}</span></div></li>`).join("")
+      : "<li><div><span>아직 요청이 없어요.</span></div></li>";
+  } catch {}
+}
+$("consultForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const res = await fetch(`/donors/${encodeURIComponent(code())}/consult`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic: f.get("topic"), message: (f.get("message") || "").trim() || null, contact_time: f.get("contact_time") }) });
+  if (!res.ok) { $("consultMsg").textContent = "보내지 못했어요: " + errText(await readJson(res)); return; }
+  e.target.reset();
+  $("consultForm").hidden = true; $("consultDone").hidden = false;
+  $("consultDone").innerHTML = `<div class="result normal"><b>상담 요청을 보냈어요</b>담당자가 확인하고 ${f.get("contact_time") === "언제든" ? "" : f.get("contact_time") + "에 "}전화를 드릴게요. 보통 1~2 근무일 안에 연락드려요.</div>`;
+  loadConsults();
+});
+$("consultStart").addEventListener("click", openConsult);
+$("chatToConsult").addEventListener("click", openConsult);
+$("closeConsult").addEventListener("click", () => $("consultDialog").close());
 $("fab").addEventListener("click", startChat);
 $("chatForm").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -936,13 +1017,39 @@ $("chatForm").addEventListener("submit", (e) => {
   if (q) { e.target.q.value = ""; ask(q); }
 });
 $("closeChat").addEventListener("click", () => $("chatDialog").close());
-function openChat() {
+let historyLoaded = false;
+async function openChat() {
   $("chatDialog").showModal();
   fetch(`/donors/${encodeURIComponent(code())}/chat/warmup`, { method: "POST" }).catch(() => {});   // 내 자료를 모델에 미리 읽혀 두기 (기다리지 않음)
+  if (historyLoaded) return;
+  historyLoaded = true;
+  // 지난 대화 불러오기: 화면에 보여 주고, 최근 10개는 대화 맥락으로 이어 쓴다
+  try {
+    const res = await fetch(`/donors/${encodeURIComponent(code())}/chat/history?limit=40`);
+    if (!res.ok) return;
+    const rows = await res.json();
+    if (!rows.length) return;
+    $("chatLog").innerHTML = "";
+    const div = document.createElement("div");
+    div.className = "chat-divider"; div.textContent = `지난 대화 · ${rows.length}개`;
+    $("chatLog").appendChild(div);
+    rows.forEach((r) => addMsg(r.role, r.content, r.role === "assistant" ? r.mode : null));
+    const end = document.createElement("div");
+    end.className = "chat-divider"; end.textContent = "오늘 대화";
+    $("chatLog").appendChild(end);
+    chat = rows.slice(-10).map((r) => ({ role: r.role, content: r.content }));
+    $("chatLog").scrollTop = $("chatLog").scrollHeight;
+  } catch {}
 }
+$("clearChat").addEventListener("click", async () => {
+  if (!confirm("지난 대화 기록을 모두 지울까요?")) return;
+  await fetch(`/donors/${encodeURIComponent(code())}/chat/history`, { method: "DELETE" });
+  chat = []; $("chatLog").innerHTML = "";
+  addMsg("bot", "대화 기록을 지웠어요.");
+});
 
 const warmUp = () => fetch(`/donors/${encodeURIComponent(code())}/chat/warmup`, { method: "POST" }).catch(() => {});
-$("donorCode").addEventListener("change", () => { chat = []; $("chatLog").innerHTML = ""; warmUp(); });
+$("donorCode").addEventListener("change", () => { chat = []; historyLoaded = false; $("chatLog").innerHTML = ""; warmUp(); });
 $("donorCode").addEventListener("change", loadAll);
 $("logoutBtn").addEventListener("click", logout);
 updateNotifyAsk();

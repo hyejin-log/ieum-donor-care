@@ -13,7 +13,7 @@ import json
 import os
 import urllib.parse
 import urllib.request
-from datetime import date
+from datetime import date, timedelta
 
 # 이음이 받는 검사 3가지와 LOINC 코드
 LOINC = {
@@ -28,15 +28,27 @@ DONOR_ID_SYSTEM = "urn:ieum:donor-code"
 
 
 # ---------- 모의 EMR 자료 (모두 가상 값) ----------
+# 날짜는 기증일 기준 (개월, 일)로 적는다: 데모 데이터를 언제 다시 만들어도 같은 상황이 되게.
 # 일부는 이음에 이미 있는 결과(중복 → 건너뜀), 일부는 아직 입력되지 않은 새 결과다.
 # D-002 크레아티닌은 일부러 µmol/L 단위로 넣어 단위 변환을 확인한다.
 MOCK_RESULTS = {
-    "D-001": [("2025-06-22", 1.18, "mg/dL", 74, "Negative"),
-              ("2026-07-08", 1.05, "mg/dL", 84, "Negative")],          # 1년 검사: 이음에 아직 없음
-    "D-002": [("2026-04-17", 1.31, "mg/dL", 66, "Negative"),
-              ("2026-10-20", 107.9, "umol/L", 72, "Trace")],           # 6개월 검사: 이음에 아직 없음
-    "D-003": [("2024-09-08", 1.12, "mg/dL", 58, "Negative")],
+    "D-001": [((0, 7), 1.18, "mg/dL", 74, "Negative"),
+              ((12, 23), 1.05, "mg/dL", 84, "Negative")],         # 1년 검사: 이음에 아직 없음
+    "D-002": [((0, 7), 1.31, "mg/dL", 66, "Negative"),
+              ((6, 10), 107.9, "umol/L", 72, "Trace")],           # 6개월 검사: 이음에 아직 없음
+    "D-003": [((0, 7), 1.12, "mg/dL", 58, "Negative")],
 }
+
+
+def add_months(d: date, months: int) -> date:
+    """d 에서 months 개월 뒤 (말일은 그 달 마지막 날로 맞춤)"""
+    y, m = divmod(d.month - 1 + months, 12)
+    y, m = d.year + y, m + 1
+    for day in (d.day, 30, 29, 28):
+        try:
+            return date(y, m, day)
+        except ValueError:
+            continue
 
 
 def _obs(code: str, i: int, loinc: str, display: str, when: str, value: dict) -> dict:
@@ -48,10 +60,14 @@ def _obs(code: str, i: int, loinc: str, display: str, when: str, value: dict) ->
             "effectiveDateTime": f"{when}T09:00:00+09:00", **value}
 
 
-def mock_bundle(donor_code: str) -> dict:
-    """모의 EMR이 돌려주는 FHIR Bundle (searchset)"""
+def mock_bundle(donor_code: str, donation_date: date | None) -> dict:
+    """모의 EMR이 돌려주는 FHIR Bundle (searchset). 기증일 기준으로 검사일을 만든다."""
     entries = []
-    for when, cr, unit, egfr, up in MOCK_RESULTS.get(donor_code, []):
+    for (months, days), cr, unit, egfr, up in (MOCK_RESULTS.get(donor_code, []) if donation_date else []):
+        tested = add_months(donation_date, months) + timedelta(days=days)
+        if tested > date.today():
+            continue                                         # 아직 오지 않은 날의 결과는 없다
+        when = tested.isoformat()
         entries += [
             _obs(donor_code, 1, "2160-0", "Creatinine [Mass/volume] in Serum or Plasma", when,
                  {"valueQuantity": {"value": cr, "unit": unit, "system": "http://unitsofmeasure.org", "code": unit}}),
@@ -66,10 +82,10 @@ def mock_bundle(donor_code: str) -> dict:
 
 # ---------- FHIR 받아 오기 ----------
 
-def fetch_bundle(donor_code: str) -> dict:
+def fetch_bundle(donor_code: str, donation_date: date | None = None) -> dict:
     base = (os.getenv("EMR_FHIR_BASE") or "").rstrip("/")
     if not base:
-        return mock_bundle(donor_code)
+        return mock_bundle(donor_code, donation_date)
     query = urllib.parse.urlencode({"patient.identifier": f"{DONOR_ID_SYSTEM}|{donor_code}",
                                     "category": "laboratory"})
     req = urllib.request.Request(f"{base}/Observation?{query}", headers={"Accept": "application/fhir+json"})

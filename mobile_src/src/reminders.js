@@ -11,13 +11,20 @@ Notifications.setNotificationHandler({
 export async function scheduleDaily(hour, minute) {
   const { status } = await Notifications.requestPermissionsAsync();
   if (status !== "granted") return false;
+  let channelId;
   if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("daily", {
-      name: "매일 측정 알림",
-      importance: Notifications.AndroidImportance.HIGH,   // 소리 + 화면 위 알림
-      sound: "default",
-      vibrationPattern: [0, 400, 200, 400],
-    });
+    // 채널의 중요도 HIGH = 소리 + 화면 위 알림. 소리는 휴대폰 기본 알림음을 쓴다.
+    // (sound: "default" 를 넣으면 일부 기기 · Expo Go 에서 NullPointerException 이 나서 넣지 않는다)
+    try {
+      await Notifications.setNotificationChannelAsync("daily-measure", {
+        name: "매일 측정 알림",
+        importance: Notifications.AndroidImportance.HIGH,
+        enableVibrate: true,
+      });
+      channelId = "daily-measure";
+    } catch (e) {
+      console.warn("알림 채널을 만들지 못해 기본 채널로 보냅니다", e);
+    }
   }
   await Notifications.cancelAllScheduledNotificationsAsync();
   await Notifications.scheduleNotificationAsync({
@@ -26,7 +33,7 @@ export async function scheduleDaily(hour, minute) {
       body: "소변을 본 뒤, 약 먹기 전에 5분 앉아 쉬고 재 주세요.",
       sound: "default",
     },
-    trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute, channelId: "daily" },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute, ...(channelId ? { channelId } : {}) },
   });
   return true;
 }

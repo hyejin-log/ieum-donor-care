@@ -5,3 +5,4 @@ fonts/
 *.xlsx
 .vscode/
 docs/videos/
+.vercel/

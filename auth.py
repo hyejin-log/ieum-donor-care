@@ -6,12 +6,12 @@
 - 공여자 가입: 병원이 알려 준 '공여자 코드 + 출생 연도'가 맞아야 그 공여자 계정을 만들 수 있다.
 - 의료진 가입: .env 의 STAFF_INVITE_CODE(병원이 정한 가입 코드)를 알아야 한다. 설정이 없으면 의료진 가입은 닫힌다.
 - 같은 아이디로 10분 안에 5번 틀리면 잠시 로그인을 막는다(무작위 대입 공격 방지).
+  실패 기록은 DB에 남긴다: 서버리스(Vercel)는 요청마다 서버가 바뀔 수 있어 메모리에 두면 잊어버린다.
 """
 import hashlib
 import hmac
 import os
 import secrets
-import time
 from datetime import datetime, timedelta, timezone
 
 from dotenv import dotenv_values
@@ -33,6 +33,11 @@ CREATE TABLE IF NOT EXISTS users (
     created_at    TIMESTAMP DEFAULT now(),
     CONSTRAINT donor_has_donor_id CHECK (role <> 'donor' OR donor_id IS NOT NULL)
 );
+CREATE TABLE IF NOT EXISTS login_failures (
+    username   TEXT NOT NULL,
+    failed_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS login_failures_user ON login_failures (username, failed_at);
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash  TEXT PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -40,7 +45,6 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 """
 
-_fails: dict[str, list[float]] = {}          # 아이디 → 최근 실패 시각들 (서버 메모리)
 
 
 # ---------- 비밀번호 ----------
@@ -66,16 +70,18 @@ def _token_hash(token: str) -> str:
 
 # ---------- 로그인 시도 제한 ----------
 
-def check_rate(username: str) -> None:
-    now = time.time()
-    recent = [t for t in _fails.get(username, []) if now - t < FAIL_WINDOW_SEC]
-    _fails[username] = recent
-    if len(recent) >= MAX_FAILS:
+def check_rate(conn, username: str) -> None:
+    conn.execute("DELETE FROM login_failures WHERE failed_at < now() - interval '1 day'")   # 오래된 기록 정리
+    n = conn.execute(
+        "SELECT count(*) AS n FROM login_failures WHERE username = %s AND failed_at > now() - make_interval(secs => %s)",
+        (username, FAIL_WINDOW_SEC),
+    ).fetchone()["n"]
+    if n >= MAX_FAILS:
         raise HTTPException(status_code=429, detail="로그인을 여러 번 실패했어요. 10분 뒤에 다시 시도해 주세요.")
 
 
-def record_fail(username: str) -> None:
-    _fails.setdefault(username, []).append(time.time())
+def record_fail(conn, username: str) -> None:
+    conn.execute("INSERT INTO login_failures (username) VALUES (%s)", (username,))
 
 
 # ---------- 세션 ----------

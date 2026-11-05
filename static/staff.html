@@ -120,6 +120,16 @@
     <ul id="emrList" style="margin:8px 0 0"></ul>
   </article>
 
+  <article id="consultBox">
+    <b>상담 요청</b> <small id="consultCount"></small>
+    <div class="overflow-auto">
+      <table>
+        <thead><tr><th>공여자</th><th>주제</th><th>내용</th><th>연락 시간</th><th>요청 시각</th><th>처리</th></tr></thead>
+        <tbody id="consultRows"><tr><td colspan="6">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+  </article>
+
   <section class="tiles">
     <div class="tile"><b id="tTotal">-</b><span>전체 공여자</span></div>
     <div class="tile warn"><b id="tMissed">-</b><span>추적검사 놓침</span></div>
@@ -280,6 +290,28 @@ $("labForm").addEventListener("submit", async (e) => {
     }
   } catch { showMsg("서버에 연결할 수 없습니다.", false); }
 });
+
+// ---------- 상담 요청 ----------
+const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+async function loadConsults() {
+  try {
+    const rows = await (await fetch("/staff/consults?status=new")).json();
+    $("consultCount").textContent = rows.length ? `· 처리 전 ${rows.length}건` : "· 처리 전 요청 없음";
+    $("consultRows").innerHTML = rows.length ? rows.map((r) => `<tr>
+      <td><b>${esc(r.donor_code)}</b></td><td>${esc(r.topic_label)}</td>
+      <td style="white-space:pre-wrap">${esc(r.message) || "-"}</td><td>${esc(r.contact_time)}</td>
+      <td>${new Date(r.created_at).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</td>
+      <td><input id="note-${r.request_id}" placeholder="처리 내용 (공여자에게 보임)" style="margin:0 0 4px;font-size:.8rem">
+          <button style="margin:0;padding:4px 10px;font-size:.8rem" onclick="doneConsult(${r.request_id})">완료</button></td></tr>`).join("")
+      : `<tr><td colspan="6">처리할 상담 요청이 없습니다.</td></tr>`;
+  } catch {}
+}
+async function doneConsult(id) {
+  const note = document.getElementById(`note-${id}`).value.trim() || null;
+  await fetch(`/staff/consults/${id}/done`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
+  loadConsults();
+}
+loadConsults();
 
 $("emrBtn").addEventListener("click", async (e) => {
   e.preventDefault();
