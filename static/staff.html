@@ -35,7 +35,7 @@
     .label { font-size: .72rem; color: var(--muted); font-weight: 600; letter-spacing: .06em; }
 
     .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
-              background: var(--card); border-radius: 999px; padding: 8px 10px 8px 22px; box-shadow: var(--shadow); margin-bottom: 14px; }
+              background: var(--card); border-radius: 24px; padding: 8px 10px 8px 22px; box-shadow: var(--shadow); margin-bottom: 14px; }
     .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; color: var(--navy); font-size: 1.05rem; }
     .logo i { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, var(--blue-2), var(--blue)); display: inline-block; }
     .logo small { font-weight: 600; font-size: .72rem; color: var(--blue); background: var(--blue-soft); padding: 3px 10px; border-radius: 999px; }
@@ -99,7 +99,7 @@
     .menu { position: relative; margin: 0; }
     .menu summary { font-size: .85rem; color: var(--ink); font-weight: 600; cursor: pointer; list-style: none; padding: 7px 4px; }
     .menu summary::-webkit-details-marker { display: none; }
-    .menu summary::after { content: " ▾"; color: var(--muted); float: none; background: none; width: auto; height: auto; transform: none; margin: 0; }
+    .menu summary::after { content: " ▾"; display: inline; color: var(--muted); float: none; background: none; width: auto; height: auto; transform: none; margin: 0; }
     .menu-list { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; background: var(--card); border-radius: 16px;
                  box-shadow: 0 12px 32px rgba(23, 35, 61, .16); padding: 8px; min-width: 260px; }
     .menu-list a { display: block; margin: 0; padding: 9px 12px; border-radius: 10px; color: var(--navy); font-weight: 600; white-space: normal; }
