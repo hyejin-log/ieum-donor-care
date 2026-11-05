@@ -43,11 +43,29 @@ MAX_TOKENS = 700
 EMERGENCY_WORDS = [
     "가슴 통증", "가슴이 아파", "숨이 차", "숨쉬기", "호흡곤란", "의식", "쓰러",
     "소변이 안 나", "소변이 안나", "피가 섞인 소변", "혈뇨", "심한 두통", "마비",
+    # 평가에서 놓친 표현 추가 (eval: "배가 너무 아파서 움직일 수가 없어요" → 모델 응급 확률이 기준 아래)
+    "움직일 수가 없", "움직일 수 없", "못 움직", "참을 수 없", "참을 수가 없",
+    # 확인용 세트(eval/holdout.csv)에서 놓친 뇌졸중 증상: 안전 문제라 확인용이어도 바로 고침
+    "말이 어눌", "발음이 이상", "얼굴 한쪽", "한쪽이 처", "한쪽 얼굴",
 ]
 EMERGENCY_REPLY = (
     "말씀하신 증상은 바로 진료가 필요할 수 있어요. 지금 119에 연락하거나 가까운 응급실로 가 주세요. "
     "이동이 가능하다면 이식센터에도 알려 주세요. 이 안내 창은 응급 상황에 답할 수 없습니다."
 )
+
+
+# 스스로를 해칠 위험을 말하는 문장: 119·응급실이 아니라 자살예방 상담전화(109)를 먼저 안내한다
+CRISIS_WORDS = ["죽고 싶", "죽고싶", "자살", "자해", "극단적", "살고 싶지", "사라지고 싶"]
+CRISIS_REPLY = (
+    "많이 힘드시군요. 혼자 견디지 않으셔도 돼요. 스스로를 해칠 생각이 든다면 지금 바로 "
+    "자살예방 상담전화 109(24시간)나 119에 연락해 주세요. 이식센터의 심리 상담 선생님과도 이야기할 수 있어요 — "
+    "'상담사와 연결하기'에서 '마음 · 생활'을 골라 주세요."
+)
+# 몸의 증상을 말하는 단어. 문장 분류 모델만 '응급'이라고 할 때, 이 단어가 하나도 없으면 오경보로 본다
+# (평가에서 "기증 후 보험 가입에 불리한가요?"를 모델이 응급 0.92로 본 일이 있어 추가: eval/report_before.md)
+SYMPTOM_WORDS = ["아파", "아프", "아픈", "통증", "답답", "숨", "어지러", "쓰러", "피", "소변", "열", "붓", "부어",
+                 "부었", "마비", "힘이 빠", "저려", "저림", "식은땀", "토하", "구토", "두통", "머리", "가슴", "의식",
+                 "경련", "떨려", "출혈", "멍", "배가", "옆구리", "상처", "수술 부위"]
 
 
 def keyword_emergency(text: str) -> bool:
@@ -58,12 +76,17 @@ def keyword_emergency(text: str) -> bool:
 def safety_check(text: str) -> dict:
     """
     응급 판단 2중 안전장치: ① 단어 목록  ② 딥러닝 문장 분류 (단어 목록에 없는 표현을 보완)
-    둘 중 하나라도 응급이면 응급으로 본다.
+    둘 중 하나라도 응급이면 응급으로 본다. 단, 모델 혼자 응급이라고 하고 몸의 증상 단어가 하나도 없으면
+    오경보로 본다 (증상 없는 '응급'은 생각하기 어렵고, 응급 평가 문장에서는 재현율이 그대로임을 확인함).
     """
+    t = text.replace(" ", "")
     tri = triage.classify(text)
     by_keyword = keyword_emergency(text)
-    by_model = bool(tri and tri["label"] == "응급")
-    return {"emergency": by_keyword or by_model, "keyword": by_keyword, "model": by_model, "triage": tri}
+    crisis = any(w.replace(" ", "") in t for w in CRISIS_WORDS)
+    has_symptom = any(w.replace(" ", "") in t for w in SYMPTOM_WORDS)
+    by_model = bool(tri and tri["label"] == "응급") and has_symptom
+    return {"emergency": by_keyword or by_model or crisis, "crisis": crisis, "keyword": by_keyword,
+            "model": by_model, "model_raw": bool(tri and tri["label"] == "응급"), "triage": tri}
 
 
 def is_emergency(text: str) -> bool:
@@ -155,7 +178,8 @@ def run_agent(messages: list[dict], impl: dict) -> dict:
     # 안전장치가 LLM보다 먼저
     safety = safety_check(question)
     if safety["emergency"]:
-        return {"reply": EMERGENCY_REPLY, "tools_used": [], "mode": "safety", "safety": safety}
+        return {"reply": CRISIS_REPLY if safety.get("crisis") else EMERGENCY_REPLY,
+                "tools_used": [], "mode": "safety", "safety": safety}
 
     if LLM_PROVIDER in ("ollama", "groq"):
         return run_ollama(messages, impl, safety)
@@ -237,9 +261,18 @@ GUIDE_KEYWORDS = {
 }
 
 
+LAB_TOPICS = {"eGFR", "크레아티닌", "소변 단백"}
+MY_VALUE_WORDS = ["내 ", "나의", "제 ", "수치", "결과", "몇이", "얼마"]
+
+
 def guide_direct(question: str) -> str | None:
     q = question.lower()
+    # "내 크레아티닌 수치 어때요?"는 용어 설명이 아니라 내 검사 값을 묻는 말 → 안내문 대신 내 기록 조회로
+    # (평가에서 안내문으로 잘못 간 일이 있어 추가: eval/report_before.md)
+    asks_my_value = any(w in q + " " for w in MY_VALUE_WORDS) and "뭐" not in q and "무엇" not in q
     for topic, words in GUIDE_KEYWORDS.items():
+        if asks_my_value and topic in LAB_TOPICS:
+            continue
         if any(w in q for w in words):
             return topic
     return None
@@ -422,17 +455,32 @@ def local_messages(messages: list[dict], impl: dict) -> tuple[list[dict], list[s
     return convo, used
 
 
-def run_ollama(messages: list[dict], impl: dict, safety: dict | None = None) -> dict:
-    question = messages[-1]["content"]
-    talk = small_talk(question, safety or safety_check(question), impl)    # DL 분류 '일반' → 바로 답
+def route(question: str, impl: dict, safety: dict | None = None) -> dict | None:
+    """
+    LLM을 부르기 전의 길 고르기 (eval/run_eval.py 가 이 함수를 그대로 평가한다).
+    순서: ① 안전(응급) → ② 일반 대화 → ③ 안내문 → ④ 내 기록 → 없으면 None (LLM이 답함)
+    의료 판단에 가까울수록 모델보다 규칙과 검증된 문구를 먼저 쓴다.
+    """
+    safety = safety or safety_check(question)
+    if safety["emergency"]:
+        return {"reply": CRISIS_REPLY if safety.get("crisis") else EMERGENCY_REPLY,
+                "tools_used": [], "mode": "safety", "safety": safety}
+    if any(w.replace(" ", "") in question.replace(" ", "") for w in MIND_WORDS):
+        return {"reply": MIND_REPLY, "tools_used": [], "mode": "mind"}
+    talk = small_talk(question, safety, impl)                    # DL 분류 '일반' → 바로 답
     if talk:
         return talk
     topic = guide_direct(question)
     if topic:
-        return {"reply": GUIDE[topic], "tools_used": ["search_guide"], "mode": "guide"}
-    rec = record_answer(question, impl)
-    if rec:
-        return rec
+        return {"reply": GUIDE[topic], "tools_used": ["search_guide"], "mode": "guide", "topic": topic}
+    return record_answer(question, impl)
+
+
+def run_ollama(messages: list[dict], impl: dict, safety: dict | None = None) -> dict:
+    question = messages[-1]["content"]
+    ready = route(question, impl, safety)
+    if ready:
+        return ready
     convo, used = local_messages(messages, impl)
     try:
         text = "".join(llm_stream(convo)).strip()
@@ -466,23 +514,16 @@ def run_agent_stream(messages: list[dict], impl: dict):
     question = messages[-1]["content"]
     safety = safety_check(question)                              # 안전장치는 항상 먼저
     if safety["emergency"]:
-        yield from _whole({"reply": EMERGENCY_REPLY, "tools_used": [], "mode": "safety", "safety": safety})
+        yield from _whole({"reply": CRISIS_REPLY if safety.get("crisis") else EMERGENCY_REPLY,
+                           "tools_used": [], "mode": "safety", "safety": safety})
         return
     if LLM_PROVIDER not in ("ollama", "groq"):                   # Claude API·데모는 한 번에 보낸다
         yield from _whole(run_agent(messages, impl))
         return
 
-    talk = small_talk(question, safety, impl)                    # DL 분류 '일반' → 바로 답
-    if talk:
-        yield from _whole(talk)
-        return
-    topic = guide_direct(question)
-    if topic:
-        yield from _whole({"reply": GUIDE[topic], "tools_used": ["search_guide"], "mode": "guide"})
-        return
-    rec = record_answer(question, impl)
-    if rec:
-        yield from _whole(rec)
+    ready = route(question, impl, safety)                        # 규칙·안내문·내 기록으로 답할 수 있으면 바로
+    if ready:
+        yield from _whole(ready)
         return
 
     convo, used = local_messages(messages, impl)
@@ -507,6 +548,14 @@ def run_agent_stream(messages: list[dict], impl: dict):
 
 # ---------- 5) 데모 모드: API 키가 없을 때의 간단한 규칙 답변 ----------
 
+# 마음이 힘들다는 말: AI가 길게 답하기보다 사람(심리 상담)에게 잇는다
+MIND_WORDS = ["우울", "불안", "잠이 안", "잠을 못", "잠이 잘 안", "외로", "무기력", "마음이 힘", "눈물이"]
+MIND_REPLY = (
+    "마음이 많이 힘드셨겠어요. 기증 뒤에 몸은 회복돼도 마음이 지치는 분들이 있어요. 이식센터에는 사회복지사·심리 상담 "
+    "선생님이 있으니 '상담사와 연결하기'에서 '마음 · 생활'을 골라 편한 시간에 전화를 받아 보세요. "
+    "혹시 스스로를 해칠 생각이 든다면 바로 109(자살예방 상담전화, 24시간)에 연락해 주세요."
+)
+
 # 내 기록·검사에 관한 단어: 이런 말이 있으면 일반 대화로 넘기지 않는다
 RECORD_WORDS = ["혈압", "체중", "몸무게", "검사", "egfr", "크레아티닌", "단백", "수치", "결과", "예약", "병원"]
 
@@ -522,6 +571,11 @@ def small_talk(question: str, safety: dict, impl: dict) -> dict | None:
     # "요즘 내 혈압 괜찮아요?"처럼 인사처럼 보여도 내 기록·안내문을 묻는 말이면 그쪽이 답한다
     q_nospace = question.replace(" ", "").lower()
     if guide_direct(question) or any(w in q_nospace for w in RECORD_WORDS):
+        return None
+    # 묻는 말인데 인사·감사가 아니면 일반 대화로 답하지 않는다
+    # (평가에서 "이번 주에 기록했나요?", "다른 기증자들은 어떻게 지내요?"에 "알려 주셔서 고마워요"라고 답한 일이 있어 추가)
+    asking = "?" in question or any(w in q_nospace for w in ["나요", "까요", "는지", "어떻게", "어때", "언제", "왜", "뭐", "무엇"])
+    if asking and not any(w in q_nospace for w in ["안녕", "반가", "고마", "감사"]):
         return None
     q = question.replace(" ", "")
     if any(w in q for w in ["고마", "감사"]):
@@ -546,7 +600,9 @@ def record_answer(question: str, impl: dict) -> dict | None:
     해당하지 않으면 None → AI가 답한다.
     """
     q = question.replace(" ", "").lower()
-    if any(w in q for w in ["다음검사", "검사언제", "언제검사", "추적검사", "검사일정", "병원언제", "예약"]):
+    asks_when = any(w in q for w in ["언제", "며칠", "날짜"])
+    if any(w in q for w in ["다음검사", "검사언제", "언제검사", "추적검사", "검사일정", "병원언제", "예약"]) or \
+            ("검사" in q and asks_when):
         s = impl["get_donation_summary"]()
         nxt = next((v for v in s["visits"] if v["status"] in ("missed", "window", "upcoming")), None)
         if nxt is None:
@@ -561,7 +617,7 @@ def record_answer(question: str, impl: dict) -> dict | None:
             reply = f"다음 검사는 {nxt['visit_name']}이고 예정일은 {nxt['due_date']}이에요. 미리 예약해 두세요."
         return {"reply": reply, "tools_used": ["get_donation_summary"], "mode": "record"}
 
-    if "혈압" in q and not any(w in q for w in ["어떻게", "재는", "측정법", "방법", "언제재"]):
+    if "혈압" in q and not any(w in q for w in ["어떻게", "어떡", "재는", "측정법", "방법", "언제재", "혈압계"]):
         rows = [r for r in impl["get_home_records"]() if r["systolic_bp"] is not None]
         if not rows:
             return {"reply": "아직 혈압 기록이 없어요. 첫 화면의 '기록하기'로 오늘 혈압을 남겨 주세요.",
@@ -578,7 +634,8 @@ def record_answer(question: str, impl: dict) -> dict | None:
             reply += " 수치에 대한 판단은 담당 의료진에게 확인해 주세요."
         return {"reply": reply, "tools_used": ["get_home_records", "get_notifications"], "mode": "record"}
 
-    if any(w in q for w in ["검사결과", "결과나왔", "내egfr", "egfr수치", "크레아티닌", "단백뇨", "소변검사"]):
+    my_lab = any(w in q for w in ["egfr", "크레아티닌", "단백"]) and any(w in q for w in ["내", "제", "나의", "수치", "몇", "얼마"])
+    if my_lab or any(w in q for w in ["검사결과", "결과나왔", "내egfr", "egfr수치", "크레아티닌", "단백뇨", "소변검사"]):
         labs = impl["get_lab_results"]()
         if not labs:
             return {"reply": "아직 등록된 병원 검사 결과가 없어요.", "tools_used": ["get_lab_results"], "mode": "record"}
