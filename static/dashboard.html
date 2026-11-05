@@ -646,13 +646,23 @@ function renderBp(rows) {
   $("bp").textContent = lastBp ? `${lastBp.systolic_bp}/${lastBp.diastolic_bp ?? "-"}` : "-";
   $("bpSub").textContent = lastBp ? `최근 ${dot(lastBp.measured_at)} · mmHg` : "기록 없음";
   const point = (key) => rows.map((r) => ({ x: r.measured_at, y: r[key] }));
+  // 점이 많으면(매일 기록) 동그라미가 겹쳐 보이므로 선만 그리고 마지막 기록만 점으로
+  const many = rows.length > 20;
+  const style = (c) => ({ borderColor: c, backgroundColor: c, borderWidth: 2.2, tension: 0.3, ...points(c),
+                          pointRadius: many ? (ctx) => (ctx.dataIndex === rows.length - 1 ? 4 : 0) : 3.5, pointHitRadius: 8 });
+  // 집에서 잰 혈압 기준선 135/85 (점선). 범례에는 숨긴다(이름이 _ 로 시작).
+  const ref = (y, color) => ({ label: `_기준 ${y}`, data: rows.length ? [{ x: rows[0].measured_at, y }, { x: rows[rows.length - 1].measured_at, y }] : [],
+                               borderColor: color, borderDash: [5, 4], borderWidth: 1.2, pointRadius: 0, fill: false, tension: 0 });
   bpChart = new Chart($("bpChart"), {
     type: "line",
     data: { datasets: [
-      { label: "수축기", data: point("systolic_bp"), borderColor: COLOR.blue, backgroundColor: COLOR.blue, borderWidth: 2.2, tension: 0.4, ...points(COLOR.blue) },
-      { label: "이완기", data: point("diastolic_bp"), borderColor: COLOR.blue2, backgroundColor: COLOR.blue2, borderWidth: 2.2, tension: 0.4, ...points(COLOR.blue2) },
+      { label: "수축기", data: point("systolic_bp"), ...style(COLOR.blue) },
+      { label: "이완기", data: point("diastolic_bp"), ...style(COLOR.blue2) },
+      ref(135, "#E06A4F"), ref(85, "#E8A99A"),
     ]},
-    options: { maintainAspectRatio: false, scales: { x: timeAxis, y: yAxis(40, 200) }, plugins: { legend } },
+    options: { maintainAspectRatio: false, scales: { x: timeAxis, y: { ...yAxis(60, 180), ticks: { stepSize: 30 } } },
+               interaction: { mode: "index", intersect: false },
+               plugins: { legend, tooltip: { filter: (i) => !i.dataset.label.startsWith("_") } } },
   });
 }
 
