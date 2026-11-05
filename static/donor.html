@@ -67,6 +67,21 @@
 
     /* 이번 주 기록 */
     .week { background: linear-gradient(135deg, #2F5BD0 0%, #5A86EE 100%); color: #fff; }
+    /* 처음 온 사람(면접관)을 위한 체험 순서 */
+    .tour { border: 1.5px dashed #9DB7F5; box-shadow: none; padding: 16px 16px 10px; }
+    .tour-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .tour-head b { color: var(--navy, #17233D); font-size: 1rem; }
+    .tour-head button { margin: 0; padding: 2px 8px; background: none; border: none; color: #8792A6; font-size: .8rem; width: auto; }
+    .tour > p { font-size: .8rem; color: #8792A6; margin: 0 0 8px; }
+    .tour ol { list-style: none; padding: 0; margin: 0; }
+    .tour li { list-style: none; margin: 0; }
+    .tour li button { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; margin: 0 0 6px; padding: 10px 12px;
+                      background: #F4F7FB; border: none; border-radius: 14px; color: #22304A; font-size: .9rem; line-height: 1.45; }
+    .tour li button:hover { background: #E3EBFC; }
+    .tour li i { font-style: normal; flex: none; width: 22px; height: 22px; border-radius: 50%; background: #3F6FE0; color: #fff;
+                 font-size: .78rem; font-weight: 700; display: grid; place-items: center; margin-top: 1px; }
+    .tour li small { display: block; color: #5B6780; font-size: .78rem; }
+    .tour li button.done { opacity: .55; }
     .week .label { color: rgba(255, 255, 255, .75); }
     .week-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-top: 4px; }
     .week h2 { margin: 0; color: #fff; font-size: 1.35rem; font-weight: 800; }
@@ -248,6 +263,18 @@
   </div>
 
   <div class="banner" id="banner"></div>
+
+  <!-- 체험 순서 (데모 계정에서만 보임) -->
+  <article class="tour" id="tour" hidden>
+    <div class="tour-head"><b>처음이라면 이 순서로 둘러보세요</b><button id="tourClose">닫기 ✕</button></div>
+    <p>가상의 공여자(기증 후 1년 반) 화면이에요. 눌러 보면 해당 기능으로 바로 갑니다.</p>
+    <ol>
+      <li><button data-tour="record"><i>1</i><span>오늘 혈압 기록하기<small>숫자를 넣으면 기준과 비교해 바로 알려 줘요</small></span></button></li>
+      <li><button data-tour="lab"><i>2</i><span>검사 결과 뜻 보기<small>eGFR·크레아티닌을 쉬운 말과 기준으로 설명해요</small></span></button></li>
+      <li><button data-tour="ask"><i>3</i><span>이음에게 물어보기<small>안내 Agent가 내 기록과 일정을 보고 답해요</small></span></button></li>
+      <li><button data-tour="emr"><i>4</i><span>의료진 화면에서 EMR 가져오기<small>지금 ‘1년 놓침’인 검사가, 병원 EMR 결과를 가져오면 ‘완료’로 바뀌어요</small></span></button></li>
+    </ol>
+  </article>
 
   <!-- 오늘 기록 -->
   <article class="week">
@@ -1060,6 +1087,30 @@ $("donorCode").addEventListener("change", () => { chat = []; historyLoaded = fal
 $("donorCode").addEventListener("change", loadAll);
 $("logoutBtn").addEventListener("click", logout);
 updateNotifyAsk();
+// ---------- 체험 순서 (데모 공여자 계정에서만) ----------
+const TOUR_KEY = "ieum_tour";
+function tourState() { try { return JSON.parse(localStorage.getItem(TOUR_KEY)) || {}; } catch { return {}; } }
+function saveTour(st) { try { localStorage.setItem(TOUR_KEY, JSON.stringify(st)); } catch {} }
+function showTour() {
+  const st = tourState();
+  if (st.closed) return;
+  $("tour").hidden = false;
+  document.querySelectorAll("[data-tour]").forEach((b) => b.classList.toggle("done", !!st[b.dataset.tour]));
+}
+$("tourClose").addEventListener("click", () => { saveTour({ ...tourState(), closed: true }); $("tour").hidden = true; });
+document.querySelectorAll("[data-tour]").forEach((b) => b.addEventListener("click", async () => {
+  const step = b.dataset.tour;
+  saveTour({ ...tourState(), [step]: true });
+  b.classList.add("done");
+  if (step === "record") $("openForm").click();
+  else if (step === "lab") document.querySelector('.lab[data-info="egfr"]').click();
+  else if (step === "ask") document.querySelector(".ask-card").scrollIntoView({ behavior: "smooth", block: "center" });
+  else if (step === "emr") {                     // 의료진 데모 계정으로 바꿔 들어가 EMR 버튼을 안내한다
+    const res = await fetch("/auth/demo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "staff" }) });
+    if (res.ok) location.href = "/staff?tour=emr";
+  }
+}));
+
 // 로그인한 사람: 공여자면 자기 코드로 고정, 의료진이면 공여자를 골라 볼 수 있게
 (async () => {
   const res = await fetch("/auth/me");
@@ -1067,6 +1118,7 @@ updateNotifyAsk();
   const me = await res.json();
   if (me.role === "donor") displayName = me.display_name;
   if (me.role === "donor") $("donorCode").innerHTML = `<option>${me.donor_code}</option>`;
+  if (me.username === "demo_donor") showTour();
   else $("demoBox").hidden = false;
   warmUp();
   loadAll();

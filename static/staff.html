@@ -94,6 +94,12 @@
     .risk.mid { background: var(--amber-soft); color: var(--amber); }
     .risk.high { background: var(--warn-soft); color: var(--warn); }
     .top-links { display: flex; gap: 6px 16px; align-items: center; flex-wrap: wrap; }
+    .tour { border: 1.5px dashed #9DB7F5; box-shadow: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .tour p { margin: 0; font-size: .9rem; color: var(--ink); line-height: 1.5; }
+    .tour p small { display: block; color: var(--muted); font-size: .78rem; }
+    .tour button { margin: 0; width: auto; padding: 8px 16px; border-radius: 999px; font-size: .85rem; }
+    .tour button.ghost { background: none; color: var(--navy); border: 1.5px solid var(--navy); }
+    .tour.ok { border-color: #5DB98A; background: #EAF7F0; }
     .topbar a, .menu summary { white-space: nowrap; }
     .topbar a.act { background: var(--navy); color: #fff; padding: 7px 14px; border-radius: 999px; margin: 0; font-weight: 600; }
     .menu { position: relative; margin: 0; }
@@ -130,6 +136,15 @@
       <a href="#" onclick="logout();return false">로그아웃</a>
     </div>
   </div>
+
+  <article class="tour" id="tour" hidden>
+    <p id="tourText"><b>체험 4단계</b> · 위의 <b>[EMR 검사 결과 가져오기]</b>를 눌러 보세요.
+      <small>병원 EMR(모의 FHIR 서버)에서 검사 결과를 받아 저장하고, 공여자 D-001의 ‘1년 놓침’ 검사가 ‘완료’로 바뀝니다.</small></p>
+    <div style="display:flex;gap:8px">
+      <button class="ghost" id="tourBack">공여자 화면에서 확인하기</button>
+      <button class="ghost" id="tourClose" style="border:none;color:var(--muted)">닫기 ✕</button>
+    </div>
+  </article>
 
   <div class="page-title">
     <h1><b>DONOR</b> FOLLOW-UP STATUS</h1>
@@ -335,6 +350,20 @@ async function doneConsult(id) {
 }
 loadConsults();
 
+// ---------- 체험 안내 (데모 의료진 계정에서만) ----------
+(async () => {
+  const res = await fetch("/auth/me");
+  if (!res.ok) return;
+  const me = await res.json();
+  let closed = false;
+  try { closed = localStorage.getItem("ieum_staff_tour") === "closed"; } catch {}
+  if (me.username === "demo_staff" && (!closed || location.search.includes("tour=emr"))) $("tour").hidden = false;
+})();
+$("tourClose").addEventListener("click", () => { try { localStorage.setItem("ieum_staff_tour", "closed"); } catch {} $("tour").hidden = true; });
+$("tourBack").addEventListener("click", async () => {
+  const res = await fetch("/auth/demo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: "donor" }) });
+  if (res.ok) location.href = "/";
+});
 $("emrBtn").addEventListener("click", async (e) => {
   e.preventDefault();
   $("emrBtn").textContent = "EMR에서 가져오는 중…";
@@ -348,6 +377,12 @@ $("emrBtn").addEventListener("click", async (e) => {
       + (r.completed_visits.length ? ` · <b>${r.completed_visits.join(", ")} 완료 처리</b>` : "")
       + (r.problems.length ? ` · 확인 필요: ${r.problems.join("; ")}` : "") + "</li>").join("");
     load();
+    if (!$("tour").hidden) {
+      $("tour").classList.add("ok");
+      $("tourText").innerHTML = `<b>가져오기 완료!</b> 아래 결과 목록에서 새로 저장된 검사와 ‘완료 처리’된 추적검사를 확인할 수 있어요.
+        <small>이제 공여자 화면으로 돌아가면 1년 검사가 ‘완료’로, 검사 결과도 새 값으로 바뀌어 있어요.</small>`;
+      $("tourBack").className = "";
+    }
   } finally { $("emrBtn").textContent = "EMR 검사 결과 가져오기"; }
 });
 load();
