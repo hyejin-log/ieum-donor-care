@@ -422,12 +422,17 @@ def page_user(request: Request) -> dict | None:
         return auth.user_from_request(conn, request)
 
 
+def page_file(name: str) -> FileResponse:
+    """화면 HTML. 브라우저가 옛 화면을 저장해 두고 보여 주지 않게, 열 때마다 새 버전인지 확인하게 한다."""
+    return FileResponse(BASE_DIR / f"static/{name}.html", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/")
 def donor_page(request: Request):
     """공여자용 화면 (로그인 필요)"""
     if page_user(request) is None:
         return RedirectResponse("/login")
-    return FileResponse(BASE_DIR / "static/donor.html")
+    return page_file("donor")
 
 
 @app.get("/staff")
@@ -436,7 +441,7 @@ def staff_page(request: Request):
     u = page_user(request)
     if u is None or u["role"] != "staff":
         return RedirectResponse("/login")
-    return FileResponse(BASE_DIR / "static/staff.html")
+    return page_file("staff")
 
 
 @app.get("/dashboard")
@@ -445,12 +450,12 @@ def dashboard_page(request: Request):
     u = page_user(request)
     if u is None or u["role"] != "staff":
         return RedirectResponse("/login")
-    return FileResponse(BASE_DIR / "static/dashboard.html")
+    return page_file("dashboard")
 
 
 @app.get("/login")
 def login_page():
-    return FileResponse(BASE_DIR / "static/login.html")
+    return page_file("login")
 
 
 # ---------- 로그인 · 회원가입 ----------
