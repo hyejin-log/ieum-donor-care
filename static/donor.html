@@ -967,6 +967,8 @@ function showBpResult(body, b) {
       <button type="button" id="soundToggle">${soundOn() ? "🔇 소리 끄기" : "🔔 소리 켜기"}</button>
     </div>`;
   $("form").hidden = true; $("resultBox").hidden = false;
+  document.querySelector("details.howto").open = false;            // 결과가 바로 보이게 측정 방법 안내는 접는다
+  $("resultBox").scrollIntoView({ block: "start" });
   $("readAgain").onclick = () => speakResult(true);
   if (warn) $("resultConsult").onclick = () => { $("formDialog").close(); openConsult(); };
   $("soundToggle").onclick = () => {
@@ -1112,7 +1114,7 @@ $("photoFile").addEventListener("change", async (e) => {
   } catch { inNote("사진을 보내지 못했어요. 숫자를 눌러 직접 적어 주세요."); }
   finally { $("photoIn").classList.remove("on"); }
 });
-$("openForm").addEventListener("click", () => { $("inNote").hidden = true; });
+$("openForm").addEventListener("click", () => { $("inNote").hidden = true; document.querySelector("details.howto").open = true; });
 
 // ---------- 안내 Agent ----------
 let chat = [];                                   // [{role, content}] 이번 대화 기록 (화면을 닫으면 유지, 공여자 바꾸면 초기화)
