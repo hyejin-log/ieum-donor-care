@@ -10,6 +10,7 @@ import pandas as pd
 import agent
 import auth
 import consult
+import clock
 import vision
 import ecrf
 import emr
@@ -144,7 +145,15 @@ def get_conn():
     배포(Neon 등)에서는 DATABASE_URL 한 줄, 내 PC에서는 DB_HOST · DB_PORT … 를 쓴다."""
     url = os.getenv("DATABASE_URL")
     if url:
-        return psycopg.connect(url, row_factory=dict_row)
+        conn = psycopg.connect(url, row_factory=dict_row)
+    else:
+        conn = _local_connect()
+    # DB도 한국 시간으로: current_date · now() 날짜 계산이 화면(한국 날짜)과 같아지게 (clock.py 참고)
+    conn.execute("SET TIME ZONE 'Asia/Seoul'")
+    return conn
+
+
+def _local_connect():
     return psycopg.connect(
         host=os.getenv("DB_HOST"),
         port=os.getenv("DB_PORT"),
@@ -611,7 +620,7 @@ def list_overdue():
 @app.get("/donors/{donor_code}/summary", dependencies=[Depends(donor_access)])
 def donor_summary(donor_code: str):
     """공여자 요약: 기증 후 일수, 추적검사 여정, 최근 검사 결과와 기준값 대비 eGFR"""
-    today = date.today()
+    today = clock.today()
     with get_conn() as conn:
         donor = get_donor(conn, donor_code)
         visits = load_visits(conn, donor["donor_id"], today)
@@ -673,7 +682,7 @@ class HomeIn(BaseModel):
     @field_validator("measured_at")
     @classmethod
     def not_in_future(cls, v: date) -> date:
-        if v > date.today():
+        if v > clock.today():
             raise ValueError("측정 날짜는 오늘 이후일 수 없습니다")
         return v
 
@@ -747,7 +756,7 @@ class LabIn(BaseModel):
     @field_validator("tested_at")
     @classmethod
     def not_in_future(cls, v: date) -> date:
-        if v > date.today():
+        if v > clock.today():
             raise ValueError("검사 날짜는 오늘 이후일 수 없습니다")
         return v
 
@@ -883,7 +892,7 @@ def list_alerts(donor_code: str):
     """의료진용 경고 목록 (혈압 · 체중 · 검사 결과 규칙)"""
     with get_conn() as conn:
         donor = get_donor(conn, donor_code)
-        return load_alerts(conn, donor["donor_id"], date.today())
+        return load_alerts(conn, donor["donor_id"], clock.today())
 
 
 # ---------- 공여자 알림 ----------
@@ -894,7 +903,7 @@ def donor_notifications(donor_code: str):
     공여자에게 보여줄 알림을 지금 상태로 계산한다.
     id는 같은 내용이면 항상 같아서, 화면에서 '이미 본 알림'을 구분할 수 있다.
     """
-    today = date.today()
+    today = clock.today()
     this_week = week_start(today)
     with get_conn() as conn:
         donor = get_donor(conn, donor_code)
@@ -1227,7 +1236,7 @@ def cron_daily(request: Request):
 @app.get("/staff/overview", dependencies=[Depends(staff_only)])
 def staff_overview():
     """공여자별 상태 요약. 검사를 놓쳤거나 기록이 끊긴 공여자가 위로 온다."""
-    today = date.today()
+    today = clock.today()
     this_week = week_start(today)
     rows = []
     with get_conn() as conn:
@@ -1419,7 +1428,7 @@ def build_research_tables(conn, today: date) -> dict[str, pd.DataFrame]:
 @app.get("/export/research.xlsx", dependencies=[Depends(staff_only)])
 def export_research():
     """연구 데이터를 엑셀 파일 하나(시트 7개)로 내려받는다. 의료진용."""
-    today = date.today()
+    today = clock.today()
     with get_conn() as conn:
         tables = build_research_tables(conn, today)
 
@@ -1447,7 +1456,7 @@ def export_ecrf(kind: Literal["data", "dictionary"] = "data"):
     eCRF에 바로 올릴 수 있는 CSV. kind=data: 입력용(REDCap Import), kind=dictionary: 변수 정의서.
     엑셀에서 한글이 깨지지 않도록 UTF-8 BOM(utf-8-sig)으로 저장한다.
     """
-    today = date.today()
+    today = clock.today()
     with get_conn() as conn:
         tables = build_research_tables(conn, today)
     df = tables["eCRF 입력용"] if kind == "data" else tables["eCRF 변수정의"]

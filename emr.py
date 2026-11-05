@@ -13,6 +13,8 @@ import json
 import os
 import urllib.parse
 import urllib.request
+
+import clock
 from datetime import date, timedelta
 
 # 이음이 받는 검사 3가지와 LOINC 코드
@@ -65,7 +67,7 @@ def mock_bundle(donor_code: str, donation_date: date | None) -> dict:
     entries = []
     for (months, days), cr, unit, egfr, up in (MOCK_RESULTS.get(donor_code, []) if donation_date else []):
         tested = add_months(donation_date, months) + timedelta(days=days)
-        if tested > date.today():
+        if tested > clock.today():
             continue                                         # 아직 오지 않은 날의 결과는 없다
         when = tested.isoformat()
         entries += [
