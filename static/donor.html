@@ -150,10 +150,16 @@
     .seg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--soft); border-radius: 16px; padding: 4px; margin: 0 0 12px; }
     .seg2 button { margin: 0; padding: 10px 4px; border-radius: 12px; border: none; background: none; color: var(--muted); font-weight: 800; font-size: .95rem; }
     .seg2 button.on { background: var(--card); color: var(--navy); box-shadow: 0 1px 3px rgba(23,35,61,.12); }
-    .days { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin: 0 0 10px; }
-    .days button { flex: none; width: auto; margin: 0; padding: 9px 12px; border-radius: 12px; font-size: .9rem; font-weight: 700;
-                   background: var(--card); color: var(--navy); border: 1.5px solid var(--line); }
-    .days button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .day-nav { display: grid; grid-template-columns: 48px 1fr 48px; gap: 6px; align-items: stretch; margin: 0 0 10px; }
+    .day-nav > button { margin: 0; padding: 0; border-radius: 12px; font-size: 1.1rem; font-weight: 800;
+                        background: var(--card); color: var(--navy); border: 1.5px solid var(--line); }
+    .day-nav > button:disabled { opacity: .3; }
+    .day-pick { position: relative; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                padding: 8px 4px; border-radius: 12px; background: var(--navy); color: #fff; cursor: pointer; }
+    .day-pick b { font-size: 1.05rem; }
+    .day-pick small { font-size: .74rem; opacity: .8; }
+    .day-pick input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+    .slot-sync { font-size: .76rem; color: var(--muted); margin: -4px 0 10px; text-align: right; }
     .times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 12px; }
     .times button { margin: 0; padding: 12px 0; border-radius: 12px; font-size: 1rem; font-weight: 800;
                     background: var(--card); color: var(--navy); border: 1.5px solid var(--line); }
@@ -517,7 +523,13 @@
         <button type="button" data-when="any">🔁 편할 때 연락받기</button>
       </div>
       <div id="bookBox">
-        <div class="days" id="dayList"></div>
+        <div class="day-nav">
+          <button type="button" id="dayPrev" aria-label="이전 날짜">◀</button>
+          <label class="day-pick"><b id="dayLabel">-</b><small id="dayHint">📅 눌러서 달력으로 고르기</small>
+            <input type="date" id="dayInput" aria-label="상담 날짜"></label>
+          <button type="button" id="dayNext" aria-label="다음 날짜">▶</button>
+        </div>
+        <p class="slot-sync" id="slotSync"></p>
         <div class="times" id="timeList"></div>
         <p class="picked" id="pickedLabel"></p>
       </div>
@@ -531,7 +543,7 @@
       <p id="consultMsg"></p>
     </form>
     <div id="consultDone" hidden></div>
-    <h4 class="sub">내 상담 요청</h4>
+    <h4 class="sub" id="consultListTitle" hidden>내 상담 요청</h4>
     <ul class="noti-list" id="consultList"></ul>
     <p class="fine">가슴 통증 · 숨참 같은 응급 상황은 상담 요청 대신 바로 119에 연락하세요.</p>
   </article>
@@ -1236,6 +1248,7 @@ async function openConsult() {
     `<label><input type="radio" name="topic" value="${k}" ${i === 0 ? "checked" : ""}> ${TOPIC_ICON[k] || ""} ${v}</label>`).join("");
   setWhen("book");
   loadSlots();
+  startSlotSync();
   loadConsults();
   if ($("chatDialog").open) $("chatDialog").close();
   $("consultDialog").showModal();
@@ -1265,22 +1278,54 @@ function setWhen(mode) {
   $("consultSubmit").textContent = mode === "book" ? (pickedAt ? "이 시간으로 예약하기" : "시간을 먼저 골라 주세요") : "상담 요청 보내기";
 }
 $("whenSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setWhen(b.dataset.when); });
-async function loadSlots() {
-  pickedAt = null; $("pickedLabel").textContent = "";
-  $("timeList").innerHTML = "<span class='fine'>시간표를 불러오는 중…</span>";
-  try { slots = await (await fetch(`/donors/${encodeURIComponent(code())}/consult/slots`)).json(); } catch { slots = []; }
-  pickedDay = Math.max(0, slots.findIndex((d) => d.times.some((t) => !t.taken)));
+// 시간표는 서버와 자동으로 맞춘다: 창이 열려 있는 동안 30초마다, 그리고 화면으로 돌아올 때 다시 받아
+// 다른 사람이 방금 예약한 시간은 바로 '예약됨'으로 바뀐다. 고른 날짜 · 시간은 그대로 둔다.
+let slotTimer = null;
+async function loadSlots(keep = false) {
+  const keepDate = keep && slots[pickedDay] ? slots[pickedDay].date : null;
+  if (!keep) { pickedAt = null; $("pickedLabel").textContent = ""; $("timeList").innerHTML = "<span class='fine'>시간표를 불러오는 중…</span>"; }
+  try { slots = await (await fetch(`/donors/${encodeURIComponent(code())}/consult/slots`)).json(); } catch { return; }
+  if (keepDate && slots.some((d) => d.date === keepDate)) pickedDay = slots.findIndex((d) => d.date === keepDate);
+  else pickedDay = Math.max(0, slots.findIndex((d) => d.times.some((t) => !t.taken)));
+  if (pickedAt) {                                   // 고른 시간이 그 사이 다른 사람에게 예약됐으면 알려 준다
+    const t = slots.flatMap((d) => d.times).find((x) => x.at === pickedAt);
+    if (!t || t.taken) { pickedAt = null; $("pickedLabel").textContent = "⚠️ 고르신 시간이 방금 예약됐어요. 다른 시간을 골라 주세요."; }
+  }
+  const now = new Date();
+  $("slotSync").textContent = `🔄 ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} 기준 · 자동으로 새로 고쳐요`;
   renderSlots();
 }
+function startSlotSync() {
+  clearInterval(slotTimer);
+  slotTimer = setInterval(() => { if ($("consultDialog").open && whenMode === "book") loadSlots(true); else clearInterval(slotTimer); }, 30000);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && $("consultDialog").open) loadSlots(true); });
 function renderSlots() {
-  $("dayList").innerHTML = slots.map((d, i) => `<button type="button" data-day="${i}" class="${i === pickedDay ? "on" : ""}">${d.label}</button>`).join("");
   const day = slots[pickedDay];
+  $("dayLabel").textContent = day ? day.label : "상담 가능한 날이 없어요";
+  $("dayPrev").disabled = pickedDay <= 0;
+  $("dayNext").disabled = pickedDay >= slots.length - 1;
+  if (slots.length) { $("dayInput").min = slots[0].date; $("dayInput").max = slots[slots.length - 1].date; $("dayInput").value = day.date; }
   $("timeList").innerHTML = day && day.times.length
     ? day.times.map((t) => `<button type="button" data-at="${t.at}" ${t.taken ? "disabled title='예약됨'" : ""} class="${t.at === pickedAt ? "on" : ""}">${t.time}</button>`).join("")
-    : "<span class='fine'>이 날은 남은 시간이 없어요.</span>";
+    : "<span class='fine'>이 날은 남은 시간이 없어요. 옆 화살표로 다른 날을 골라 주세요.</span>";
   setWhen(whenMode);
 }
-$("dayList").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; pickedDay = +b.dataset.day; renderSlots(); });
+$("dayPrev").addEventListener("click", () => { if (pickedDay > 0) { pickedDay--; renderSlots(); } });
+$("dayNext").addEventListener("click", () => { if (pickedDay < slots.length - 1) { pickedDay++; renderSlots(); } });
+// 달력에서 고른 날짜를 시간표와 맞춘다: 주말 · 지난 날 · 범위 밖이면 가장 가까운 상담일로 옮긴다
+$("dayInput").addEventListener("change", (e) => {
+  const v = e.target.value;
+  if (!v || !slots.length) return;
+  let i = slots.findIndex((d) => d.date === v);
+  if (i < 0) {
+    i = slots.findIndex((d) => d.date > v);
+    if (i < 0) i = slots.length - 1;
+    $("dayHint").textContent = "주말이라 가까운 평일로 바꿨어요";
+    setTimeout(() => { $("dayHint").textContent = "📅 눌러서 달력으로 고르기"; }, 3000);
+  }
+  pickedDay = i; renderSlots();
+});
 $("timeList").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b || b.disabled) return;
   pickedAt = b.dataset.at;
@@ -1290,22 +1335,24 @@ $("timeList").addEventListener("click", (e) => {
 });
 async function loadConsults() {
   try {
-    const rows = await (await fetch(`/donors/${encodeURIComponent(code())}/consult`)).json();
-    $("consultList").innerHTML = rows.length ? rows.map((r) => {
+    const all = await (await fetch(`/donors/${encodeURIComponent(code())}/consult`)).json();
+    const rows = all.filter((r) => r.handled_by !== "공여자");          // 내가 취소한 요청은 목록에서 뺀다
+    $("consultListTitle").hidden = $("consultList").hidden = !rows.length;
+    $("consultList").innerHTML = rows.map((r) => {
       const open = r.status !== "done";
       const when = r.callback_label ? `📞 ${r.callback_label} 전화 예약` : `${dot(r.created_at.slice(0, 10))} 요청${r.contact_time && r.contact_time !== "언제든" ? ` · ${r.contact_time} 연락` : ""}`;
       return `<li class="${open ? "warn" : "ok"}"><div>
-        <b>${r.topic_label} · ${open ? (r.callback_label ? "예약됨" : "연락 기다리는 중") : (r.handled_by === "공여자" ? "취소함" : "상담 완료")}</b>
-        <span>${when}${r.staff_note && r.handled_by !== "공여자" ? ` · 담당자: ${escapeHtml(r.staff_note)}` : ""}</span>
+        <b>${r.topic_label} · ${open ? (r.callback_label ? "예약됨" : "연락 기다리는 중") : "상담 완료"}</b>
+        <span>${when}${r.staff_note ? ` · 담당자: ${escapeHtml(r.staff_note)}` : ""}</span>
         ${open ? `<button type="button" class="cancel" data-cancel="${r.request_id}">${r.callback_label ? "예약 취소" : "요청 취소"}</button>` : ""}</div></li>`;
-    }).join("") : "<li><div><span>아직 요청이 없어요.</span></div></li>";
+    }).join("");
   } catch {}
 }
 $("consultList").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-cancel]"); if (!b) return;
   if (!confirm("이 상담 요청을 취소할까요?")) return;
   await fetch(`/donors/${encodeURIComponent(code())}/consult/${b.dataset.cancel}/cancel`, { method: "POST" });
-  loadConsults(); loadSlots();
+  loadConsults(); loadSlots(true);
 });
 $("consultForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -1316,7 +1363,7 @@ $("consultForm").addEventListener("submit", async (e) => {
                  callback_at: whenMode === "book" ? pickedAt : null };
   const res = await fetch(`/donors/${encodeURIComponent(code())}/consult`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const d = await readJson(res);
-  if (!res.ok) { $("consultMsg").textContent = "보내지 못했어요: " + errText(d); if (res.status === 409) loadSlots(); return; }
+  if (!res.ok) { $("consultMsg").textContent = "보내지 못했어요: " + errText(d); if (res.status === 409) loadSlots(true); return; }
   e.target.reset();
   $("consultForm").hidden = true; $("consultDone").hidden = false;
   $("consultDone").innerHTML = d.callback_label
@@ -1327,6 +1374,7 @@ $("consultForm").addEventListener("submit", async (e) => {
 $("consultStart").addEventListener("click", openConsult);
 $("chatToConsult").addEventListener("click", openConsult);
 $("closeConsult").addEventListener("click", () => $("consultDialog").close());
+$("consultDialog").addEventListener("close", () => clearInterval(slotTimer));
 $("fab").addEventListener("click", startChat);
 $("chatForm").addEventListener("submit", (e) => {
   e.preventDefault();

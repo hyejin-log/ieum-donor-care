@@ -139,8 +139,11 @@
     .next .flag.amber::before { background: #FFE19C; }
     .next .flag:empty { display: none; }
 
-    .journey { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-    .visit-list { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+    .journey { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    /* 칸보다 길면 카드 안에서 위아래로 끌어(스크롤) 본다 · 카드 밖으로 튀어나오지 않게 */
+    .visit-list { list-style: none; padding: 0 2px 0 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0;
+                  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+    .visit-list li { flex: none; }
     .visit-list li { list-style: none; display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 14px; background: var(--soft); margin: 0; }
     .v-icon { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-size: .72rem; font-weight: 800; flex: none; }
     .done .v-icon { background: var(--ok-soft); color: var(--ok); }

@@ -1155,7 +1155,7 @@ def list_my_consults(donor_code: str):
     with get_conn() as conn:
         donor = get_donor(conn, donor_code)
         rows = conn.execute(
-            "SELECT request_id, topic, message, contact_time, callback_at, status, staff_note, created_at, handled_at "
+            "SELECT request_id, topic, message, contact_time, callback_at, status, staff_note, handled_by, created_at, handled_at "
             "FROM consult_requests WHERE donor_id = %s ORDER BY created_at DESC LIMIT 10",
             (donor["donor_id"],),
         ).fetchall()
