@@ -38,8 +38,9 @@
     .try h2 { font-size: 1.05rem; margin: 0 0 4px; color: #17233D; }
     .try p { font-size: .8rem; color: #8792A6; margin: 0 0 12px; }
     .try .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .try .btns button { margin: 0; padding: 14px 8px; border-radius: 16px; font-weight: 700; font-size: .95rem; line-height: 1.35; }
-    .try .btns button small { display: block; font-weight: 500; font-size: .74rem; opacity: .8; }
+    .try .btns a { display: block; text-align: center; text-decoration: none; background: #17233D; color: #fff; border: 1.5px solid #17233D; }
+    .try .btns a { margin: 0; padding: 14px 8px; border-radius: 16px; font-weight: 700; font-size: .95rem; line-height: 1.35; }
+    .try .btns a small { display: block; font-weight: 500; font-size: .74rem; opacity: .8; }
     .try .btns .staff { background: #fff; color: #17233D; border: 1.5px solid #17233D; }
     .feat { list-style: none; padding: 0; margin: 0 0 14px; }
     .feat li { list-style: none; display: flex; gap: 10px; align-items: flex-start; font-size: .86rem; color: #22304A; margin: 0 0 8px; line-height: 1.5; }
@@ -61,8 +62,8 @@
     <h2>바로 체험하기</h2>
     <p>로그인 없이 들어갑니다 · 자료는 모두 가상 데이터이고 매일 새벽 처음 상태로 돌아갑니다</p>
     <div class="btns">
-      <button type="button" data-demo="donor">공여자 화면<small>기록 · 검사 설명 · 안내 Agent</small></button>
-      <button type="button" data-demo="staff" class="staff">의료진 화면<small>추적 관리 · EMR · eCRF</small></button>
+      <a href="/demo/donor" role="button" rel="nofollow" data-demo="donor">공여자 화면<small>기록 · 검사 설명 · 안내 Agent</small></a>
+      <a href="/demo/staff" role="button" rel="nofollow" data-demo="staff" class="staff">의료진 화면<small>추적 관리 · EMR · eCRF</small></a>
     </div>
   </section>
 
@@ -126,11 +127,7 @@ fetch("/guide/demo").then((r) => r.json()).then((d) => {
   $("tryBox").hidden = true;                 // 데모 사이트가 아니면(실제 병원 배포) 체험 버튼을 숨긴다
   $("signupNote").hidden = true;
 }).catch(() => {});
-document.querySelectorAll("[data-demo]").forEach((b) => b.onclick = () => {
-  document.querySelectorAll("[data-demo]").forEach((x) => x.setAttribute("aria-busy", "true"));
-  send("/auth/demo", { role: b.dataset.demo }).finally(() =>
-    document.querySelectorAll("[data-demo]").forEach((x) => x.removeAttribute("aria-busy")));
-});
+document.querySelectorAll("[data-demo]").forEach((b) => b.addEventListener("click", () => b.setAttribute("aria-busy", "true")));
 $("tabLogin").onclick = () => show("login");
 $("tabSignup").onclick = () => show("signup");
 $("signupForm").addEventListener("change", (e) => {
