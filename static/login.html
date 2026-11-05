@@ -54,7 +54,7 @@
   <p class="tag">생체 신장 기증 이후의 건강을 끊기지 않게 잇습니다</p>
   <p class="problem">신장 기증 후에도 평생 정기 검사가 필요하지만, 시간이 지날수록 검사에서 빠지기 쉽습니다. <b>이음</b>은 공여자와 의료진을 이어 그 공백을 줄입니다.</p>
 
-  <section class="try" id="tryBox" hidden>
+  <section class="try" id="tryBox">
     <h2>바로 체험하기</h2>
     <p>로그인 없이 들어갑니다 · 자료는 모두 가상 데이터이고 매일 새벽 처음 상태로 돌아갑니다</p>
     <div class="btns">
@@ -84,7 +84,7 @@
     </form>
 
     <form id="signupForm" hidden>
-      <p class="demo-only" id="signupNote" hidden>실제 병원에서는 이식센터가 알려 준 <b>공여자 코드 + 출생 연도</b>(의료진은 병원 가입 코드)가 맞아야 가입됩니다. 본인이 아닌 사람이 남의 기록을 보지 못하게 하기 위한 설계예요. 둘러보시려면 위의 <b>바로 체험하기</b>를 눌러 주세요.</p>
+      <p class="demo-only" id="signupNote">실제 병원에서는 이식센터가 알려 준 <b>공여자 코드 + 출생 연도</b>(의료진은 병원 가입 코드)가 맞아야 가입됩니다. 본인이 아닌 사람이 남의 기록을 보지 못하게 하기 위한 설계예요. 둘러보시려면 위의 <b>바로 체험하기</b>를 눌러 주세요.</p>
       <div class="roles">
         <label><input type="radio" name="role" value="donor" checked> 공여자</label>
         <label><input type="radio" name="role" value="staff"> 의료진</label>
@@ -119,9 +119,9 @@ function show(tab) {
   $("msg").textContent = "";
 }
 fetch("/guide/demo").then((r) => r.json()).then((d) => {
-  if (!(d.accounts && d.accounts.length)) return;
-  $("tryBox").hidden = false;
-  $("signupNote").hidden = false;
+  if (d.accounts && d.accounts.length) return;
+  $("tryBox").hidden = true;                 // 데모 사이트가 아니면(실제 병원 배포) 체험 버튼을 숨긴다
+  $("signupNote").hidden = true;
 }).catch(() => {});
 document.querySelectorAll("[data-demo]").forEach((b) => b.onclick = () => {
   document.querySelectorAll("[data-demo]").forEach((x) => x.setAttribute("aria-busy", "true"));
