@@ -118,6 +118,9 @@
       .topbar { border-radius: 22px; padding: 12px 14px; }
       .menu-list { left: auto; right: 0; max-width: calc(100vw - 32px); }
     }
+    /* 창이 열리면 뒤 화면은 멈추고, 창 안에서만 스크롤 (두 겹 스크롤 방지) */
+    html:has(dialog[open]) { overflow: hidden; scrollbar-gutter: stable; }
+    dialog article { overscroll-behavior: contain; }
   </style>
 </head>
 <body>
