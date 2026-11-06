@@ -210,6 +210,27 @@
       .who, #todayStatus { display: none; }
       .grid2 { grid-template-columns: 1fr; }
     }
+    /* 그래프 인터랙션 (설명 상자 · 날짜 표 · 기간 선택) */
+    .chart-box canvas:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 8px; }
+    .bk-tip { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .15s;
+              background: rgba(23, 35, 61, .95); color: #fff; border-radius: 12px; padding: 8px 11px; font-size: .74rem; line-height: 1.55;
+              box-shadow: 0 10px 24px rgba(23, 35, 61, .22); white-space: nowrap; }
+    .bk-tip.on { opacity: 1; }
+    .bk-tip .d { color: #AFC0E6; font-size: .68rem; display: flex; align-items: center; gap: 6px; }
+    .bk-tip .r { display: flex; align-items: center; gap: 6px; }
+    .bk-tip .r b { margin-left: auto; padding-left: 10px; font-size: .82rem; }
+    .bk-tip .r.sub { color: #D7DFF0; }
+    .bk-tip i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+    .bk-tip .tag { background: #E06A4F; color: #fff; border-radius: 999px; padding: 0 7px; font-size: .64rem; font-weight: 700; margin-left: 6px; }
+    .bk-tip .hint { margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,.12); color: #8FA2C9; font-size: .64rem; }
+    @media (hover: none) { .bk-tip .hint { display: none; } }
+    .bk-pill { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .15s;
+               background: var(--navy); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: .66rem; font-weight: 700; }
+    .bk-pill.on { opacity: 1; }
+    .bk-sel { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; background: var(--blue-soft); color: var(--ink);
+              border-radius: 10px; padding: 3px 4px 3px 10px; line-height: 1.5; }
+    .bk-sel b.warn { color: #E06A4F; }
+    .bk-sel button { all: unset; cursor: pointer; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #EEF2F7; color: var(--muted); font-size: .66rem; }
     /* 창이 열리면 뒤 화면은 멈추고, 창 안에서만 스크롤 (두 겹 스크롤 방지) */
     html:has(dialog[open]) { overflow: hidden; scrollbar-gutter: stable; }
     dialog article { overscroll-behavior: contain; }
@@ -491,6 +512,159 @@ const fadeFill = (rgb) => (ctx) => {
 };
 const points = (color) => ({ pointRadius: 3.5, pointHoverRadius: 6, pointBackgroundColor: "#fff", pointBorderColor: color, pointBorderWidth: 2 });
 
+// ---------- 그래프 인터랙션 ----------
+// bklit 차트(React · d3)의 동작을 이 화면의 Chart.js에 옮긴 것:
+// 처음 그릴 때 왼쪽→오른쪽으로 펼쳐지기, 따라오는 세로선 + 날짜 표, 커서 근처 구간만 진하게,
+// 부드럽게 따라오는 설명 상자, 끌어서 기간 고르기(혈압), 키보드 ← → 이동.
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const easeInOut = (() => {                         // cubic-bezier(0.85, 0, 0.15, 1)
+  const x = (t) => 3 * (1 - t) ** 2 * t * 0.85 + 3 * (1 - t) * t * t * 0.15 + t ** 3;
+  const y = (t) => 3 * (1 - t) * t * t + t ** 3;
+  return (p) => { let lo = 0, hi = 1; for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; x(m) < p ? (lo = m) : (hi = m); } return y((lo + hi) / 2); };
+})();
+const REVEAL_MS = 1100, SPAN = 46;
+const mainMetas = (chart) => chart.data.datasets.map((d, i) => ({ d, i })).filter(({ d, i }) => d.main && chart.isDatasetVisible(i)).map(({ i }) => chart.getDatasetMeta(i));
+
+const bkPlugin = {
+  id: "bk",
+  beforeDatasetsDraw(chart) {
+    const s = chart.$bk; if (!s) return;
+    const { ctx } = chart, a = chart.chartArea;
+    ctx.save();
+    if (s.sel) {                                   // 고른 기간: 옅은 면 + 양 끝 점선
+      const [l, r] = [Math.min(s.sel.a, s.sel.b), Math.max(s.sel.a, s.sel.b)];
+      ctx.fillStyle = "rgba(63,111,224,.08)"; ctx.fillRect(l, a.top, r - l, a.height);
+      ctx.strokeStyle = "rgba(63,111,224,.6)"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+      [l, r].forEach((x) => { ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke(); });
+      ctx.setLineDash([]);
+    }
+    if (s.p < 1) { ctx.beginPath(); ctx.rect(0, 0, a.left + a.width * easeInOut(s.p) + 4, chart.height); ctx.clip(); }
+  },
+  beforeDatasetDraw(chart, args) {
+    const s = chart.$bk;
+    if (s && s.idx != null && chart.data.datasets[args.index].main) { chart.ctx.save(); chart.ctx.globalAlpha = 0.3; s.dim = true; }
+  },
+  afterDatasetDraw(chart) { const s = chart.$bk; if (s && s.dim) { chart.ctx.restore(); s.dim = false; } },
+  afterDatasetsDraw(chart) {
+    chart.ctx.restore();
+    const s = chart.$bk; if (!s || s.idx == null || s.x == null) return;
+    const { ctx } = chart, a = chart.chartArea, x = s.x;
+    // 세로선: 위아래 끝은 흐리게
+    const g = ctx.createLinearGradient(0, a.top, 0, a.bottom);
+    g.addColorStop(0, "rgba(23,35,61,0)"); g.addColorStop(0.18, "rgba(23,35,61,.45)");
+    g.addColorStop(0.82, "rgba(23,35,61,.45)"); g.addColorStop(1, "rgba(23,35,61,0)");
+    ctx.save(); ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke(); ctx.restore();
+    for (const meta of mainMetas(chart)) {
+      const color = chart.data.datasets[meta.index].borderColor;
+      // 커서 근처 구간만 원래 진하기로 다시 그린다 (나머지는 흐리게 남음)
+      ctx.save(); ctx.beginPath(); ctx.rect(x - SPAN, a.top - 6, SPAN * 2, a.height + 12); ctx.clip();
+      ctx.shadowColor = color; ctx.shadowBlur = 6; meta.dataset.draw(ctx, a); ctx.restore();
+      const el = meta.data[s.idx];
+      if (!el || el.skip || !Number.isFinite(el.y)) continue;
+      ctx.save();
+      ctx.fillStyle = color; ctx.globalAlpha = 0.18; ctx.beginPath(); ctx.arc(el.x, el.y, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = "#fff"; ctx.strokeStyle = color; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(el.x, el.y, 4.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+  },
+};
+
+// chart: 만든 Chart, opt: { date(i), rows(i), select?(i0, i1) }
+function attachBk(chart, opt) {
+  const canvas = chart.canvas, box = canvas.parentElement;
+  box.querySelectorAll(".bk-tip,.bk-pill,.bk-sel").forEach((e) => e.remove());
+  const mk = (cls) => { const e = document.createElement("div"); e.className = cls; box.append(e); return e; };
+  const tip = mk("bk-tip"), pill = mk("bk-pill");
+  const selBox = opt.selTarget || null, selOrig = selBox ? selBox.innerHTML : "";   // 고른 기간 요약은 제목 아래 줄에 잠시 바꿔 보여 준다
+  const s = chart.$bk = { p: REDUCED ? 1 : 0, idx: null, x: null, tx: null, tipX: null, sel: null, raf: 0 };
+  canvas.tabIndex = 0;
+  canvas.style.touchAction = "pan-y";
+  const valid = () => { const m = mainMetas(chart)[0]; return m ? m.data.map((el, i) => (el && !el.skip && Number.isFinite(el.x) ? i : -1)).filter((i) => i >= 0) : []; };
+
+  // 처음 그릴 때 펼쳐지기
+  if (!REDUCED) {
+    const t0 = performance.now();
+    const step = (t) => { s.p = Math.min(1, (t - t0) / REVEAL_MS); chart.draw(); if (s.p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
+
+  function render() {
+    const a = chart.chartArea;
+    if (s.idx == null) { tip.classList.remove("on"); pill.classList.remove("on"); chart.draw(); return; }
+    const k = REDUCED ? 1 : 0.3;                    // 따라오는 속도 (1 = 바로)
+    s.x = s.x == null ? s.tx : s.x + (s.tx - s.x) * k;
+    tip.innerHTML = opt.rows(s.idx); pill.textContent = opt.date(s.idx);
+    const w = tip.offsetWidth, want = s.tx + 16 + w > box.clientWidth ? s.tx - 16 - w : s.tx + 16;
+    s.tipX = s.tipX == null ? want : s.tipX + (want - s.tipX) * k;
+    tip.style.transform = `translate(${s.tipX}px, ${a.top + 2}px)`;
+    pill.style.transform = `translate(${Math.min(Math.max(s.x, a.left + 30), a.right - 30)}px, ${a.bottom + 3}px) translateX(-50%)`;
+    tip.classList.add("on"); pill.classList.add("on");
+    chart.draw();
+    if (Math.abs(s.tx - s.x) > 0.4 || Math.abs(want - s.tipX) > 0.4) s.raf = requestAnimationFrame(render); else s.raf = 0;
+  }
+  const kick = () => { if (!s.raf) s.raf = requestAnimationFrame(render); };
+  const setIdx = (i) => {
+    const m = mainMetas(chart)[0];
+    if (i == null || !m) { s.idx = null; s.x = s.tipX = null; cancelAnimationFrame(s.raf); s.raf = 0; render(); return; }
+    s.idx = i; s.tx = m.data[i].x; kick();
+  };
+  const nearest = (px) => {
+    const m = mainMetas(chart)[0]; let best = null, bd = Infinity;
+    for (const i of valid()) { const d = Math.abs(m.data[i].x - px); if (d < bd) { bd = d; best = i; } }
+    return best;
+  };
+  const localX = (e) => e.clientX - canvas.getBoundingClientRect().left;
+  const inside = (px) => px >= chart.chartArea.left - 8 && px <= chart.chartArea.right + 8;
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (s.p < 1) return;
+    const px = localX(e);
+    if (s.drag) { s.sel.b = Math.min(Math.max(px, chart.chartArea.left), chart.chartArea.right); showSel(); }
+    if (!inside(px)) return setIdx(null);
+    setIdx(nearest(px));
+  });
+  canvas.addEventListener("pointerleave", () => { if (!s.drag) setIdx(null); });
+
+  // 끌어서 기간 고르기 (마우스 · 펜)
+  if (opt.select) {
+    canvas.addEventListener("pointerdown", (e) => {
+      if (s.p < 1 || e.button !== 0 || e.pointerType === "touch" || !inside(localX(e))) return;
+      const px = Math.min(Math.max(localX(e), chart.chartArea.left), chart.chartArea.right);
+      s.drag = true; s.sel = { a: px, b: px }; canvas.setPointerCapture(e.pointerId); showSel();
+    });
+    canvas.addEventListener("pointerup", () => {
+      if (!s.drag) return;
+      s.drag = false;
+      if (Math.abs(s.sel.a - s.sel.b) < 6) clearSel(); else showSel();
+    });
+    canvas.addEventListener("dblclick", clearSel);
+  }
+  function showSel() {
+    if (!s.sel) return;
+    const m = mainMetas(chart)[0];
+    const [l, r] = [Math.min(s.sel.a, s.sel.b), Math.max(s.sel.a, s.sel.b)];
+    const idx = valid().filter((i) => m.data[i].x >= l && m.data[i].x <= r);
+    selBox.innerHTML = `<span class="bk-sel">${idx.length ? opt.select(idx[0], idx[idx.length - 1], idx) : "고른 기간에 기록이 없어요"}<button type="button" aria-label="기간 선택 지우기">✕</button></span>`;
+    const b = selBox.querySelector("button"); if (b) b.onclick = clearSel;
+    chart.draw();
+  }
+  function clearSel() { s.sel = null; s.drag = false; if (selBox) selBox.innerHTML = selOrig; chart.draw(); }
+
+  // 키보드: 그래프를 누른 뒤 ← → 로 한 칸씩, Esc로 닫기
+  canvas.addEventListener("keydown", (e) => {
+    const v = valid(); if (!v.length) return;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      const pos = s.idx == null ? (e.key === "ArrowLeft" ? v.length : -1) : v.indexOf(s.idx);
+      setIdx(v[Math.min(Math.max(pos + (e.key === "ArrowLeft" ? -1 : 1), 0), v.length - 1)]);
+    } else if (e.key === "Escape") { setIdx(null); clearSel(); }
+  });
+  canvas.addEventListener("blur", () => setIdx(null));
+}
+// 이 두 그래프는 위 동작으로 그리므로 Chart.js 기본 설명 상자 · 움직임은 끈다 (범례 클릭은 유지)
+const bkOptions = { animation: false, events: ["click"], plugins: { tooltip: { enabled: false } } };
+
 
 // ---------- 전체 불러오기 ----------
 let lastSummary = null;                           // 설명 창에서 쓰는 최근 요약
@@ -651,7 +825,7 @@ function renderBaseline(s, rows) {
     );
   }
   datasets.push({
-    label: "나의 eGFR",
+    label: "나의 eGFR", main: true,
     data: rows.filter((r) => r.egfr != null).map((r) => ({ x: r.tested_at, y: r.egfr })),
     borderColor: COLOR.blue, backgroundColor: fadeFill("63, 111, 224"), fill: "origin",
     borderWidth: 2.4, tension: 0.4, ...points(COLOR.blue),
@@ -659,7 +833,16 @@ function renderBaseline(s, rows) {
   egfrChart = new Chart($("egfrChart"), {
     type: "line",
     data: { datasets },
-    options: { maintainAspectRatio: false, scales: { x: timeAxis, y: yAxis(0, Math.max(120, (pre || 0) + 15)) }, plugins: { legend } },
+    options: { ...bkOptions, maintainAspectRatio: false, scales: { x: timeAxis, y: yAxis(0, Math.max(120, (pre || 0) + 15)) },
+               plugins: { ...bkOptions.plugins, legend } },
+    plugins: [bkPlugin],
+  });
+  const eg = datasets[datasets.length - 1].data;
+  attachBk(egfrChart, {
+    date: (i) => dot(eg[i].x),
+    rows: (i) => `<div class="d">${dot(eg[i].x)} 검사</div>
+      <div class="r"><i style="background:${COLOR.blue}"></i>eGFR <b>${eg[i].y}</b></div>` +
+      (pre ? `<div class="r sub">기증 전의 <b>${Math.round((eg[i].y / pre) * 100)}%</b>${eg[i].y >= pre * 0.6 ? "" : '<span class="tag">60% 아래</span>'}</div>` : ""),
   });
 }
 
@@ -681,13 +864,31 @@ function renderBp(rows) {
   bpChart = new Chart($("bpChart"), {
     type: "line",
     data: { datasets: [
-      { label: "수축기", data: point("systolic_bp"), ...style(COLOR.blue) },
-      { label: "이완기", data: point("diastolic_bp"), ...style(COLOR.blue2) },
+      { label: "수축기", data: point("systolic_bp"), main: true, ...style(COLOR.blue) },
+      { label: "이완기", data: point("diastolic_bp"), main: true, ...style(COLOR.blue2) },
       ref(135, "#E06A4F"), ref(85, "#E8A99A"),
     ]},
-    options: { maintainAspectRatio: false, scales: { x: timeAxis, y: { ...yAxis(60, 180), ticks: { stepSize: 30 } } },
-               interaction: { mode: "index", intersect: false },
-               plugins: { legend, tooltip: { filter: (i) => !i.dataset.label.startsWith("_") } } },
+    options: { ...bkOptions, maintainAspectRatio: false, scales: { x: timeAxis, y: { ...yAxis(60, 180), ticks: { stepSize: 30 } } },
+               plugins: { ...bkOptions.plugins, legend } },
+    plugins: [bkPlugin],
+  });
+  const over = (r) => r.systolic_bp >= 135 || r.diastolic_bp >= 85;
+  const fmt = (v) => (v == null ? "-" : v);
+  attachBk(bpChart, {
+    date: (i) => dot(rows[i].measured_at),
+    rows: (i) => { const r = rows[i];
+      return `<div class="d">${dot(r.measured_at)}${over(r) ? '<span class="tag">기준 위</span>' : ""}</div>
+        <div class="r"><i style="background:${COLOR.blue}"></i>수축기 <b>${fmt(r.systolic_bp)}</b></div>
+        <div class="r"><i style="background:${COLOR.blue2}"></i>이완기 <b>${fmt(r.diastolic_bp)}</b></div>
+        <div class="hint">끌어서 기간을 고르면 평균을 보여 줘요</div>`; },
+    selTarget: $("bpSub"),
+    select: (i0, i1, idx) => {
+      const rs = idx.map((i) => rows[i]).filter((r) => r.systolic_bp != null);
+      const avg = (k) => Math.round(rs.reduce((t, r) => t + (r[k] ?? 0), 0) / Math.max(1, rs.filter((r) => r[k] != null).length));
+      const n = rs.filter(over).length;
+      return `<b>${dot(rows[i0].measured_at).slice(5)} – ${dot(rows[i1].measured_at).slice(5)}</b> · 기록 ${rs.length}일 · 평균 <b>${avg("systolic_bp")}/${avg("diastolic_bp")}</b>` +
+             ` · 기준(135/85) 넘은 날 <b class="${n ? "warn" : ""}">${n}일</b>`;
+    },
   });
 }
 
