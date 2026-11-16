@@ -20,6 +20,7 @@ load_dotenv(override=True)   # main.py보다 먼저 import되므로 여기서도
 import urllib.error
 import urllib.request
 
+import rag                   # 안내 자료 검색 (RAG: knowledge/*.md → 관련 조각 → LLM 근거)
 import triage                # 딥러닝 문장 분류 (응급 / 문의 / 일반)
 
 try:
@@ -113,7 +114,11 @@ GUIDE = {
 
 
 def search_guide(topic: str) -> dict:
-    """주제 단어로 안내문을 찾는다. 정확히 없으면 단어가 겹치는 항목을 돌려준다."""
+    """안내 자료(knowledge/*.md)를 검색한다(rag.py). 찾지 못하면 예전 안내문 사전에서 찾는다."""
+    hits = rag.search(topic)
+    if hits:
+        return {"query": topic, "results": [{"n": i, "title": h["title"], "section": h["section"], "text": h["text"],
+                                             "source": h["source"]} for i, h in enumerate(hits, 1)]}
     if topic in GUIDE:
         return {"topic": topic, "text": GUIDE[topic]}
     hits = {k: v for k, v in GUIDE.items() if k in topic or topic in k or any(w in v for w in topic.split())}
@@ -136,7 +141,7 @@ TOOLS = [
      "description": "지금 이 공여자에게 표시되는 알림(검사 기간, 놓친 검사, 오늘 기록 요청, 혈압 주의 등)을 조회한다.",
      "input_schema": {"type": "object", "properties": {}}},
     {"name": "search_guide",
-     "description": "이식센터 안내문을 주제로 찾는다. 주제: " + ", ".join(GUIDE) + ".",
+     "description": "이식센터 안내 자료를 검색한다. 질문을 그대로 넣어도 된다. 결과마다 번호(n), 제목, 출처가 있다. 예: " + ", ".join(GUIDE) + ".",
      "input_schema": {"type": "object",
                       "properties": {"topic": {"type": "string", "description": "찾을 주제"}},
                       "required": ["topic"]}},
@@ -147,7 +152,7 @@ SYSTEM_PROMPT = """당신은 생체 신장 기증자 추적관리 앱 '이음'�
 
 규칙:
 1. 공여자의 기록, 일정, 검사 값은 반드시 도구로 조회한 내용만 말하고, 날짜를 함께 알려 주세요. 추측하지 마세요.
-2. 일반 안내는 search_guide 도구의 안내문을 바탕으로 답하세요. 안내문에 없는 의학 정보는 지어내지 마세요.
+2. 일반 안내는 search_guide 도구로 찾은 자료만 바탕으로 답하고, 근거가 된 문장 끝에 자료 번호를 [1]처럼 붙이세요. 자료에 없는 의학 정보는 지어내지 말고 "안내 자료에 없는 내용"이라고 말하세요.
 3. 진단, 처방, 약 용량 결정, 검사 수치가 정상인지 비정상인지의 판단은 하지 마세요. 그런 질문에는 확인된 값과 일반적인 설명만 전하고 "담당 의료진에게 확인해 주세요"라고 안내하세요.
 4. 응급 증상(가슴 통증, 숨이 참, 소변이 거의 나오지 않음, 혈뇨, 심한 두통, 마비)이 언급되면 다른 설명보다 먼저 119나 응급실을 안내하세요.
 5. 이음 앱과 기증 후 관리에 관한 질문이 아니면 정중히 범위를 벗어난다고 말하세요.
@@ -471,14 +476,55 @@ def route(question: str, impl: dict, safety: dict | None = None) -> dict | None:
     if talk:
         return talk
     topic = guide_direct(question)
-    if topic:
-        return {"reply": GUIDE[topic], "tools_used": ["search_guide"], "mode": "guide", "topic": topic}
-    return record_answer(question, impl)
+    if topic:                                                    # 안내 주제가 분명함 → 자료 검색(RAG)
+        return rag_answer(question) or {"reply": GUIDE[topic], "tools_used": ["search_guide"], "mode": "guide", "topic": topic}
+    rec = record_answer(question, impl)
+    if rec:
+        return rec
+    return rag_answer(question, strict=True)                     # 주제어가 없어도 자료와 확실히 겹치면 근거로 답한다 (없으면 None → LLM)
+
+
+# ---------- 4-1) RAG: 찾은 자료로만 답하기 ----------
+RAG_RULES = """
+- 아래 [자료]에 있는 내용으로만 답하고, 근거가 된 문장 끝에 자료 번호를 [1]처럼 붙여라.
+- [자료]로 답할 수 없으면 "안내 자료에 없는 내용이에요."라고 말하고 담당 의료진이나 이식센터에 확인하라고 안내하라.
+- 자료에 없는 숫자, 약 이름, 기간은 쓰지 마라."""
+
+
+def rag_answer(question: str, strict: bool = False) -> dict | None:
+    """자료를 찾으면 답 재료(docs)와 함께 돌려준다. reply 는 LLM을 쓸 수 없을 때 보여 줄 '찾은 자료 그대로'의 답.
+    strict: 안내 주제어 없이 들어온 질문은 기준을 높인다 (평가에서 '다른 기증자들은 어떻게 지내요?'가 혈압 자료로 간 일이 있음)"""
+    hits = rag.search(question, **(rag.STRICT if strict else {}))
+    if not hits:
+        return None
+    top = hits[0]
+    return {"reply": f"{top['text']} [1]", "tools_used": ["search_guide"], "mode": "rag", "topic": top["doc"],
+            "docs": hits, "sources": rag.sources(hits)}
+
+
+def rag_messages(messages: list[dict], hits: list[dict]) -> list[dict]:
+    system = LOCAL_SYSTEM + RAG_RULES + "\n[자료]\n" + rag.context_block(hits)
+    return [{"role": "system", "content": system}] + [{"role": m["role"], "content": m["content"]} for m in messages[-4:]]
+
+
+def cited_ok(text: str, n: int) -> bool:
+    """답에 붙은 번호가 실제 자료 번호 안에 있는지 (없는 [5]를 지어내면 실패)."""
+    import re
+    nums = [int(x) for x in re.findall(r"\[(\d+)\]", text)]
+    return all(1 <= x <= n for x in nums)
 
 
 def run_ollama(messages: list[dict], impl: dict, safety: dict | None = None) -> dict:
     question = messages[-1]["content"]
     ready = route(question, impl, safety)
+    if ready and ready["mode"] == "rag":
+        try:
+            text = "".join(llm_stream(rag_messages(messages, ready["docs"]))).strip()
+        except LLMError:
+            return ready                                         # 연결 실패 → 찾은 자료 그대로
+        if text and not any(b in text for b in BANNED) and cited_ok(text, len(ready["docs"])):
+            ready = {**ready, "reply": text}
+        return {k: v for k, v in ready.items() if k != "docs"}
     if ready:
         return ready
     convo, used = local_messages(messages, impl)
@@ -505,7 +551,7 @@ def run_ollama(messages: list[dict], impl: dict, safety: dict | None = None) -> 
 def _whole(answer: dict):
     """미리 완성된 답(안전 안내, 안내문, 내 기록, 데모)을 스트리밍 형식으로 보낸다."""
     yield {"type": "meta", "mode": answer["mode"], "tools_used": answer["tools_used"],
-           "safety": answer.get("safety")}
+           "safety": answer.get("safety"), "sources": answer.get("sources")}
     yield {"type": "delta", "text": answer["reply"]}
     yield {"type": "done"}
 
@@ -522,6 +568,9 @@ def run_agent_stream(messages: list[dict], impl: dict):
         return
 
     ready = route(question, impl, safety)                        # 규칙·안내문·내 기록으로 답할 수 있으면 바로
+    if ready and ready["mode"] == "rag":
+        yield from _rag_stream(messages, ready)
+        return
     if ready:
         yield from _whole(ready)
         return
@@ -543,6 +592,24 @@ def run_agent_stream(messages: list[dict], impl: dict):
     # 출력 검사는 다 만든 뒤에 한다. 걸리면 화면의 답을 정해진 답으로 바꾼다.
     if not text.strip() or any(b in text for b in BANNED):
         yield {"type": "replace", "mode": "guarded", "text": GUARDED_REPLY}
+    yield {"type": "done"}
+
+
+def _rag_stream(messages: list[dict], ready: dict):
+    """찾은 자료를 LLM에 넣어 답을 흘려보낸다. 출처는 처음(meta)에 보내 화면이 답 아래에 붙인다."""
+    yield {"type": "meta", "mode": "rag", "tools_used": ready["tools_used"], "sources": ready["sources"]}
+    text = ""
+    try:
+        for piece in llm_stream(rag_messages(messages, ready["docs"])):
+            text += piece
+            yield {"type": "delta", "text": piece}
+    except LLMError:
+        yield {"type": "replace", "mode": "rag", "text": ready["reply"]}   # 연결 실패 → 찾은 자료 그대로
+        yield {"type": "done"}
+        return
+    # 출력 검사: 정상 판단 표현, 없는 자료 번호를 지어낸 답 → 찾은 자료 그대로로 바꾼다
+    if not text.strip() or any(b in text for b in BANNED) or not cited_ok(text, len(ready["docs"])):
+        yield {"type": "replace", "mode": "rag", "text": ready["reply"]}
     yield {"type": "done"}
 
 
@@ -661,6 +728,9 @@ def demo_answer(question: str, impl: dict) -> dict:
     rec = record_answer(question, impl)
     if rec:
         return rec
+    found = rag_answer(question)                       # 데모에서도 안내 자료를 찾으면 찾은 부분을 출처와 함께 보여 준다
+    if found:
+        return {k: v for k, v in found.items() if k != "docs"}
     q = question.replace(" ", "")
     if any(w in q for w in ["다음검사", "검사언제", "추적검사", "일정"]):
         s = impl["get_donation_summary"]()

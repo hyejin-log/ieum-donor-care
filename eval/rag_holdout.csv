@@ -1,0 +1,18 @@
+question,expected,why
+기증 후 1년 검사에서는 뭘 확인해요,followup,새 기준값
+몇 년마다 병원 가서 피검사 해야 돼요,followup,평생 매년
+혈압 잴 때 팔 위치는 어떻게 해요,blood_pressure,측정 자세
+혈압이 며칠째 140이 넘어요,blood_pressure,흐름 · 연락
+신장 기능이 기증 전보다 절반 가까이 줄었대요,kidney_function,60~70% 적응
+eGFR은 어떻게 계산해요,kidney_function,크레아티닌·나이·성별
+소변에 거품이 나고 단백이 1+ 나왔어요,urine_protein,양성 → 정밀검사
+타이레놀이랑 다른 진통제 차이가 뭐예요,medicine,NSAIDs vs 아세트아미노펜
+CT 찍을 때 조영제 맞아도 돼요,medicine,기증 사실 알리기
+짜게 먹으면 안 되는 이유가 뭐예요,lifestyle,소금·혈압
+담배 피워도 되나요,lifestyle,금연
+수영이나 자전거 타도 돼요,exercise,회복 후 운동
+출산할 때 산부인과에 말해야 하나요,pregnancy,기증 사실 알리기
+소변이 하루 종일 거의 안 나와요,emergency,119
+사진으로 입력하면 사진이 저장되나요,app_usage,저장 안 함
+기증하면 군대 면제되나요,none,자료에 없음
+이음 앱 만든 회사가 어디예요,none,자료에 없음

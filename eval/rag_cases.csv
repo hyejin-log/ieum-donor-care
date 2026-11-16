@@ -1,0 +1,35 @@
+question,expected,why
+기증하고 나서 검사는 얼마나 자주 받아야 하나요,followup,일정 질문(내 일정이 아닌 일반 규칙)
+2년 지나면 더 이상 병원 안 가도 되나요,followup,평생 1년에 한 번
+추적검사를 왜 꼭 받아야 해요,followup,빠지면 안 되는 이유
+검사 날짜를 미루고 싶은데 어떻게 해요,followup,일정 변경
+혈압은 언제 재는 게 제일 좋아요,blood_pressure,측정 시간
+집에서 잰 혈압 기준이 병원이랑 왜 달라요,blood_pressure,135/85 와 140/90
+혈압이 190이 나왔어요 다시 재야 하나요,blood_pressure,높을 때 대처
+혈압이 낮게 나오고 핑 돌아요,blood_pressure,낮을 때 대처
+기증하면 콩팥 수치가 왜 떨어져요,kidney_function,eGFR 60~70%
+크레아티닌이 뭐예요,kidney_function,용어
+근육 운동하면 크레아티닌이 바뀌나요,kidney_function,근육량 영향
+소변 검사에서 미량이 나왔어요,urine_protein,결과 읽기
+운동하고 나서 소변 단백이 양성이 나왔어요,urine_protein,일시적 양성
+머리 아플 때 이부프로펜 먹어도 돼요,medicine,NSAIDs
+감기약 처방받을 때 말해야 하는 게 있나요,medicine,기증 사실 알리기
+단백질 보충제 먹어도 되나요,medicine,보충제
+한약 먹어도 괜찮을까요,medicine,한약
+라면이나 국물 먹어도 되나요,lifestyle,짠 음식
+술은 마셔도 되나요,lifestyle,술
+물은 얼마나 마셔야 해요,lifestyle,수분
+살이 찌면 신장에 안 좋아요,lifestyle,체중
+수술하고 언제부터 헬스 해도 돼요,exercise,회복 기간
+축구나 격투기 같은 운동 해도 돼요,exercise,부딪치는 운동
+기증했는데 아기 가져도 되나요,pregnancy,임신
+임신하면 뭘 조심해야 해요,pregnancy,임신 중 확인
+어떤 증상이면 응급실 가야 해요,emergency,119 증상 목록
+열나고 옆구리가 아파요 병원 가야 하나요,emergency,오늘 연락
+말로 혈압 입력하는 법 알려줘,app_usage,말로 입력
+혈압계 사진 찍으면 어떻게 돼요,app_usage,사진 입력
+상담 예약은 어떻게 취소해요,app_usage,상담 연결
+보험 가입할 때 불리한가요,none,자료에 없음 → 지어내지 않아야
+주식 추천해줘,none,범위 밖
+오늘 날씨 어때,none,범위 밖
+기증자에게 나라에서 주는 지원금이 있나요,none,자료에 없음

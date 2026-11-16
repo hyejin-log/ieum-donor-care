@@ -2,7 +2,7 @@
 안내 Agent 길 고르기(route) 평가.
 
 질문마다 '어느 길로 가야 맞는지' 정답을 붙여 두고(eval/cases.csv), agent.route() 를 그대로 돌려 비교한다.
-  safety : 응급 → AI 답 없이 119 안내          guide  : 검증된 안내문 그대로
+  safety : 응급 → AI 답 없이 119 안내          guide  : 안내 자료로 답함 (RAG 검색 · 안내문)
   record : 내 기록을 조회해 정해진 문장으로      chat   : 인사·근황                            mind   : 마음 건강 → 심리 상담 연결
   llm    : 위 어디에도 해당하지 않아 LLM이 답함
 LLM은 부르지 않는다(가짜 기록 사용) → 키·인터넷 없이 몇 초 만에 같은 결과가 나온다.
@@ -19,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import agent  # noqa: E402
+import rag  # noqa: E402
 
 # 가짜 공여자 기록 (D-001 데모와 비슷한 상태): 1년 검사 놓침, 최근 혈압 정상, 오늘 기록 없음
 IMPL = {
@@ -39,6 +40,8 @@ def run(cases_path: Path = ROOT / "eval" / "cases.csv") -> dict:
     for r in rows:
         ans = agent.route(r["question"], IMPL)
         got = ans["mode"] if ans else "llm"
+        if got == "rag":          # RAG(자료 검색 답)도 '검증된 안내 자료로 답함'이라 guide 와 같은 길로 센다
+            got = "guide"
         results.append({**r, "got": got, "ok": got == r["expected"],
                         "detail": (ans or {}).get("topic", "")})
     total = len(results)
@@ -71,6 +74,39 @@ def report(s: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+# ---------- RAG 검색 평가 ----------
+# 질문마다 '어느 문서에서 답을 찾아야 하는지' 정답을 붙였다(eval/rag_cases.csv, rag_holdout.csv). none = 자료에 없음.
+#   hit@1 : 첫 번째로 찾은 조각이 정답 문서     hit@3 : 상위 3개 안에 정답 문서
+#   MRR   : 정답 문서가 몇 번째에 나왔는지의 역수 평균 (1등 1, 2등 0.5, 3등 0.33, 없음 0)
+#   모름   : 자료에 없는 질문에 '없음'이라고 답한 비율 (지어내지 않기)
+def run_rag(path: Path) -> dict:
+    rows = list(csv.DictReader(path.open(encoding="utf-8")))
+    res = []
+    for r in rows:
+        docs = [h["doc"] for h in rag.search(r["question"])]
+        if r["expected"] == "none":
+            res.append({**r, "got": docs[0] if docs else "none", "ok": not docs, "rank": None})
+        else:
+            rank = docs.index(r["expected"]) + 1 if r["expected"] in docs else None
+            res.append({**r, "got": docs[0] if docs else "none", "ok": rank == 1, "rank": rank})
+    ans = [x for x in res if x["expected"] != "none"]
+    none = [x for x in res if x["expected"] == "none"]
+    return {"results": res, "n": len(ans), "hit1": sum(x["rank"] == 1 for x in ans), "hit3": sum(x["rank"] is not None for x in ans),
+            "mrr": sum(1 / x["rank"] for x in ans if x["rank"]) / max(1, len(ans)),
+            "none_n": len(none), "none_ok": sum(x["ok"] for x in none)}
+
+
+def report_rag(s: dict, title: str) -> str:
+    lines = [f"### {title}", "",
+             f"- hit@1: **{s['hit1']}/{s['n']} ({s['hit1'] / s['n']:.0%})** · hit@3: {s['hit3']}/{s['n']} · MRR: {s['mrr']:.2f}",
+             f"- 자료에 없는 질문에 '없음': **{s['none_ok']}/{s['none_n']}**", ""]
+    fails = [x for x in s["results"] if not x["ok"]]
+    if fails:
+        lines += ["| 질문 | 정답 문서 | 1등으로 찾은 문서 | 정답 순위 |", "|---|---|---|---|"]
+        lines += [f"| {x['question']} | {x['expected']} | {x['got']} | {x['rank'] or '-'} |" for x in fails]
+    return "\n".join(lines) + "\n"
+
+
 if __name__ == "__main__":
     # 개발용(cases.csv): 실패를 보고 고친 질문들 → 고친 뒤 100%가 나와도 '외운' 것일 수 있다
     # 확인용(holdout.csv): 고칠 때 보지 않은 새 질문들 → 실제 실력에 가까운 숫자
@@ -78,6 +114,9 @@ if __name__ == "__main__":
     text = ("## 개발용 세트 (cases.csv)\n\n" + report(dev).split("\n", 2)[2] +
             "\n## 확인용 세트 (holdout.csv · 고칠 때 보지 않은 질문)\n\n" + report(hold).split("\n", 2)[2])
     text = "# 안내 Agent 길 고르기 평가\n\n" + text
+    rd, rh = run_rag(ROOT / "eval" / "rag_cases.csv"), run_rag(ROOT / "eval" / "rag_holdout.csv")
+    text += ("\n## RAG 검색 평가 (rag.py)\n\n" + report_rag(rd, "개발용 (rag_cases.csv · 기준 점수를 정할 때 본 질문)")
+             + "\n" + report_rag(rh, "확인용 (rag_holdout.csv · 기준을 정한 뒤 한 번만 돌린 질문)"))
     (ROOT / "eval" / "report.md").write_text(text, encoding="utf-8")
     print(text)
     ok = dev["emer_caught"] == dev["emer_total"] and hold["emer_caught"] == hold["emer_total"]
